@@ -1,0 +1,1 @@
+This app will work as your assistant in daily household work.
