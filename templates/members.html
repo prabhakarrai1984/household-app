@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Family - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Who counts?</h2>
+    <p class="muted">Only people on this list are recorded, both when importing a WhatsApp chat and when posting
+      from the web page. Anyone else is ignored. Until you add the first person, the web page accepts anyone.</p>
+    <form method="post" action="{{ url_for('members_add') }}">
+      <label>Name (shown in the app)
+        <input name="name" placeholder="e.g. Asha" required>
+      </label>
+      <label>Name as it appears in the WhatsApp chat (only if different)
+        <input name="chat_name" placeholder="e.g. Asha Sharma or Mom">
+      </label>
+      <label>Phone number (only for people the chat shows as a number, e.g. +91 98765 43210)
+        <input name="phone" placeholder="optional" inputmode="tel">
+      </label>
+      <button type="submit">Add family member</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Family members</h2>
+    {% if members %}
+    <div class="table-wrap">
+    <table>
+      <tr><th>Name</th><th>In WhatsApp</th><th>Phone</th><th>Status</th><th></th></tr>
+      {% for m in members %}
+      <tr>
+        <td>{{ m.name }}</td>
+        <td>{{ m.chat_name or '-' }}</td>
+        <td>{{ m.phone or '-' }}</td>
+        <td>{% if m.active %}<span class="badge">Active</span>{% else %}<span class="badge off">Paused</span>{% endif %}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('members_toggle', member_id=m.id) }}">
+            <input type="hidden" name="active" value="{{ 0 if m.active else 1 }}">
+            <button class="small secondary" type="submit">{{ 'Pause' if m.active else 'Resume' }}</button>
+          </form>
+          <form class="inline" method="post" action="{{ url_for('members_delete', member_id=m.id) }}"
+                onsubmit='return confirm({{ ("Remove " ~ m.name ~ "? Their past expenses are kept.") | tojson }})'>
+            <button class="small secondary" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% else %}
+    <p class="muted">Nobody added yet.</p>
+    {% endif %}
+  </div>
+{% endblock %}

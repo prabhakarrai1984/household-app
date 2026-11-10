@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="card">
+    <h2>Total expenses (all time)</h2>
+    <div class="total">{{ total | inr }}</div>
+    <p class="muted"><a href="{{ url_for('export_excel') }}">Download Excel file</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Add an expense</h2>
+    <form method="post" action="{{ url_for('post_message') }}">
+      <input name="sender" placeholder="Your name" value="{{ sender }}" required>
+      <input name="text" placeholder="e.g. Spent 450 on vegetables" autocomplete="off" required autofocus>
+      <button type="submit">Send</button>
+    </form>
+    <p class="muted">Try: <em>Medicine 320 yesterday</em> &middot; <em>Gift 1500 birthday</em> &middot;
+      <em>petrol 2000</em> &middot; <em>total</em> &middot; <em>help</em></p>
+  </div>
+
+  {% if by_category %}
+  <div class="card">
+    <h2>By category</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Category</th><th class="num">Entries</th><th class="num">Total</th></tr>
+      {% for row in by_category %}
+      <tr><td>{{ row.category }}</td><td class="num">{{ row.entries }}</td><td class="num">{{ row.total | inr }}</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Recent expenses</h2>
+    {% if recent %}
+    <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th>By</th><th class="num">Amount</th></tr>
+      {% for row in recent %}
+      <tr>
+        <td>{{ row.expense_date | nicedate }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.added_by }}</td>
+        <td class="num">{{ row.amount | inr }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% else %}
+    <p class="muted">Nothing recorded yet. Send your first message above, or <a href="{{ url_for('import_page') }}">import a WhatsApp chat</a>.</p>
+    {% endif %}
+  </div>
+{% endblock %}

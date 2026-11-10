@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Household App{% endblock %}</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1f2933; --muted: #667085; --line: #e4e7ec;
+    --accent: #0f766e; --ok: #067647; --okbg: #ecfdf3; --err: #b42318; --errbg: #fef3f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161b; --card: #1b2128; --text: #e8ecf0; --muted: #98a2b3; --line: #2b333c;
+      --accent: #2dd4bf; --ok: #75e0a7; --okbg: #10291d; --err: #fda29b; --errbg: #3b1a18;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  nav { margin-bottom: 16px; }
+  nav a { margin-right: 16px; text-decoration: none; color: var(--muted); font-weight: 600; }
+  nav a.active { color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 2px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; margin-bottom: 16px; }
+  .total { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+  .msg { white-space: pre-line; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
+  .msg.ok { background: var(--okbg); color: var(--ok); }
+  .msg.error { background: var(--errbg); color: var(--err); }
+  form { display: grid; gap: 10px; }
+  form.inline { display: inline; }
+  label { font-size: 0.9rem; color: var(--muted); display: grid; gap: 4px; }
+  input, button, select { font: inherit; padding: 10px 12px; border-radius: 8px;
+                          border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  input[type=checkbox] { width: 18px; height: 18px; padding: 0; }
+  button { background: var(--accent); color: #fff; border: 0; font-weight: 600; cursor: pointer; }
+  button.small { padding: 4px 10px; font-size: 0.85rem; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  .badge { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: var(--okbg); color: var(--ok); }
+  .badge.off { background: var(--errbg); color: var(--err); }
+  a { color: var(--accent); }
+  ol { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Household App</h1>
+  <nav>
+    <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}class="active"{% endif %}>Home</a>
+    <a href="{{ url_for('import_page') }}" {% if request.endpoint in ('import_page', 'import_upload') %}class="active"{% endif %}>Import chat</a>
+    <a href="{{ url_for('members_page') }}" {% if request.endpoint == 'members_page' %}class="active"{% endif %}>Family</a>
+  </nav>
+
+  {% for category, text in get_flashed_messages(with_categories=true) %}
+    <div class="msg {{ category }}">{{ text }}</div>
+  {% endfor %}
+
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

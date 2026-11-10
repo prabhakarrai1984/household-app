@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Import chat - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Import a WhatsApp chat</h2>
+    <ol>
+      <li>Open the family chat in WhatsApp. On Android: menu (&#8942;) &rarr; <strong>More</strong> &rarr;
+        <strong>Export chat</strong> &rarr; <strong>Without media</strong>. On iPhone: tap the group name
+        &rarr; <strong>Export Chat</strong> &rarr; <strong>Without Media</strong>.</li>
+      <li>Save or share the file to this device.</li>
+      <li>Choose it below. The file can be a <code>.txt</code> or a <code>.zip</code>.</li>
+    </ol>
+    <form method="post" action="{{ url_for('import_upload') }}" enctype="multipart/form-data">
+      <input type="file" name="chat_file" accept=".txt,.zip,text/plain,application/zip" required>
+      <button type="submit">Read the chat</button>
+    </form>
+    <p class="muted">Nothing is saved yet. You'll see what was found and tick what to keep.
+      Only messages from people on the <a href="{{ url_for('members_page') }}">Family</a> list are used,
+      and importing the same chat twice never creates duplicates.</p>
+  </div>
+{% endblock %}
