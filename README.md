@@ -5,7 +5,7 @@ A family expense tracker. Family members send short messages like
 keeps a running total, and stores everything in a database plus an Excel file.
 
 **Status:** expenses, income, reports, undo/edit, chat import and recurring expenses.
-This Flask version is the working prototype and rulebook for the planned on-device Android app.
+This Flask version is the working prototype and rulebook. The phone version (data stays on the phone) is in `pwa/` - see `pwa/README.md`.
 Messages can be typed into the web page, or imported from an exported WhatsApp chat.
 
 ## Run it
@@ -176,5 +176,5 @@ Also: US-4 undo and edit your last entry, plus editing and deleting any entry on
 
 ## Roadmap
 
-1. **Next:** port the core rules to Java and build the Android app (data stays on each person's phone)
-2. **Later:** editing categories and keywords in the app
+1. **Now:** phone web app in `pwa/` (install from the browser, data on the phone, your own categories)
+2. **Next:** native Android app (real alarm reminders, Google Play)

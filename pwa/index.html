@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>Household App</title>
+</head>
+<body>
+<header><h1 id="title">Household</h1><span id="sub" class="muted"></span></header>
+<main id="view" aria-live="polite"></main>
+<nav id="tabs">
+  <a href="#home" data-tab="home"><span>🏠</span>Home</a>
+  <a href="#entries" data-tab="entries"><span>🧾</span>Entries</a>
+  <a href="#reports" data-tab="reports"><span>📊</span>Reports</a>
+  <a href="#recurring" data-tab="recurring"><span>🔁</span>Recurring</a>
+  <a href="#more" data-tab="more"><span>⋯</span>More</a>
+</nav>
+<div id="toast" role="status"></div>
+<noscript>This app needs JavaScript.</noscript>
+<script type="module" src="app.js"></script>
+</body>
+</html>
