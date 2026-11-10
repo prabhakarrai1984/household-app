@@ -13,6 +13,7 @@ CATEGORIES = [
     "Entertainment", "Clothes", "Travel", "Vehicle", "Gift",
 ]
 UNCATEGORIZED = "Uncategorized"
+INCOME = "Income"  # the "category" stored for income entries
 
 # Words a person types to name a category directly. These WIN over keyword guessing.
 CATEGORY_NAMES = {
@@ -35,7 +36,10 @@ KEYWORDS = {
     "Grocery": ["vegetable", "vegetables", "fruit", "fruits", "milk", "rice", "atta",
                 "dal", "oil", "bread", "eggs", "supermarket", "bigbasket", "blinkit",
                 "zepto", "kirana", "tomato", "tomatoes", "onion", "onions", "potato",
-                "potatoes", "paneer", "curd", "sugar", "salt"],
+                "potatoes", "paneer", "curd", "sugar", "salt",
+                "dhaniya", "mirchi", "cauliflower", "gobi", "bottle gourd", "lauki",
+                "palak", "bhindi", "sabzi", "sabji", "dmart", "d mart", "d-mart",
+                "ghee", "honey", "soap"],
     "Medicine": ["medical", "pharmacy", "doctor", "tablet", "tablets", "hospital",
                  "clinic", "chemist", "apollo"],
     "School Fees": ["school"],
@@ -48,7 +52,7 @@ KEYWORDS = {
                "uber", "ola", "taxi", "metro", "auto"],
     "Vehicle": ["petrol", "diesel", "fuel", "car", "bike", "servicing", "car service",
                 "bike service", "tyre", "parking", "fastag", "puncture", "engine oil"],
-    "Gift": ["present", "birthday", "wedding", "anniversary"],
+    "Gift": ["present", "birthday", "wedding", "anniversary", "dooj", "rakhi", "diwali gift"],
 }
 
 
@@ -62,6 +66,11 @@ class ParsedExpense:
     category: str
     description: str
     expense_date: date
+    entry_type: str = "Expense"  # or "Income"
+
+
+# A message that STARTS with "income" or "salary" is income ("Income tax 5000" is not).
+_INCOME_START = re.compile(r"^\s*(income|salary)\b(?!\s+tax)", re.IGNORECASE)
 
 
 def today_local():
@@ -134,6 +143,11 @@ def parse_message(text, today=None):
         raise ParseError("The message was empty.")
     today = today or today_local()
 
+    income_start = _INCOME_START.match(text)
+    entry_type = "Income" if income_start else "Expense"
+    if income_start and income_start.group(1).lower() == "income":
+        text = text[income_start.end():].strip(" :-")  # "Income 85000 salary" -> "85000 salary"
+
     amount, amount_match = _find_amount(text)
     if amount is None or amount <= 0:
         raise ParseError("I couldn't find an amount in that message.")
@@ -142,6 +156,29 @@ def parse_message(text, today=None):
     if re.search(r"\byesterday\b", text, flags=re.IGNORECASE):
         expense_date = today - timedelta(days=1)
 
-    category = categorize(text)
+    category = INCOME if entry_type == "Income" else categorize(text)
     description = _clean_description(text, amount_match, category)
-    return ParsedExpense(round(amount, 2), category, description, expense_date)
+    return ParsedExpense(round(amount, 2), category, description, expense_date, entry_type)
+
+
+def parse_edit(text, today=None):
+    """'edit 500', 'edit gift', 'edit 500 gift', 'edit yesterday' -> the fields to change."""
+    today = today or today_local()
+    body = re.sub(r"^\s*edit\b", "", (text or "").strip(), flags=re.IGNORECASE).strip()
+    changes = {}
+    amount, _ = _find_amount(body)
+    if amount is not None:
+        if amount <= 0:
+            raise ParseError("The amount must be more than zero.")
+        changes["amount"] = round(amount, 2)
+    category = categorize(body)
+    if category != UNCATEGORIZED:
+        changes["category"] = category
+    if re.search(r"\byesterday\b", body, flags=re.IGNORECASE):
+        changes["expense_date"] = today - timedelta(days=1)
+    elif re.search(r"\btoday\b", body, flags=re.IGNORECASE):
+        changes["expense_date"] = today
+    if not changes:
+        raise ParseError("Tell me what to change, for example: edit 500, edit grocery, "
+                         "edit 500 grocery or edit yesterday.")
+    return changes

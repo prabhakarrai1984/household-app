@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Edit entry - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Edit {{ 'income' if entry.entry_type == 'Income' else 'expense' }}</h2>
+    <form method="post" action="{{ url_for('entry_edit_save', entry_id=entry.id) }}">
+      <label>Date
+        <input type="date" name="expense_date" value="{{ form.get('expense_date') or entry.expense_date }}" required>
+      </label>
+      <label>Amount (₹)
+        <input name="amount" inputmode="decimal" value="{{ form.get('amount') or '%.2f' | format(entry.amount) }}" required>
+      </label>
+      {% if entry.entry_type == 'Income' %}
+      <p class="muted">This is income, so it has no category.</p>
+      {% else %}
+      <label>Category
+        <select name="category">
+          {% set chosen = form.get('category') or entry.category %}
+          {% for category in categories %}
+          <option {% if category == chosen %}selected{% endif %}>{{ category }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <label>Description
+        <input name="description" maxlength="200" value="{{ form.get('description') or entry.description }}" required>
+      </label>
+      <button type="submit">Save changes</button>
+    </form>
+    <p class="muted">Added by {{ entry.added_by }} on {{ entry.created_at }}.
+      <a href="{{ url_for('entries_page') }}">Back to entries</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Delete</h2>
+    <form method="post" action="{{ url_for('entry_delete', entry_id=entry.id) }}"
+          onsubmit='return confirm({{ ("Delete " ~ (entry.amount | inr) ~ " " ~ entry.description ~ "?") | tojson }})'>
+      <button class="secondary" type="submit">Delete this entry</button>
+    </form>
+  </div>
+{% endblock %}

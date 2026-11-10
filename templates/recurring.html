@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Recurring - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Recurring expenses</h2>
+    {% if items %}
+    <div class="table-wrap">
+    <table>
+      <tr><th>What</th><th>When</th><th class="num">Amount</th><th></th></tr>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.row.name }}<div class="muted">{{ item.row.category }} &middot; {{ item.row.frequency }}, day {{ item.row.due_day }}</div></td>
+        <td class="{{ 'neg' if item.state == 'overdue' }}">{{ item.text }}</td>
+        <td class="num">{{ item.row.amount | inr }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('recurring_paid', recurring_id=item.row.id) }}">
+            <button class="small" type="submit">Mark paid</button></form>
+          <form class="inline" method="post" action="{{ url_for('recurring_delete', recurring_id=item.row.id) }}"
+                onsubmit="return confirm('Stop this recurring expense? Past payments stay.')">
+            <button class="small secondary" type="submit">Stop</button></form>
+        </td>
+      </tr>
+      <tr><td colspan="4" class="muted">Share to the group:
+        <em>{{ item.share }}</em> &middot; after paying: <em>{{ item.paid_share }}</em></td></tr>
+      {% endfor %}
+    </table>
+    </div>
+    <p class="muted">Copy a line into the family WhatsApp group. <em>Mark paid</em> records the expense and moves the due date on.</p>
+    {% else %}
+    <p class="muted">Nothing yet. Add rent, EMIs, insurance or school fees below.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Add a recurring expense</h2>
+    <form method="post" action="{{ url_for('recurring_add') }}">
+      <div class="filters">
+        <label>Name <input name="name" placeholder="Rent" required></label>
+        <label>Amount <input name="amount" inputmode="decimal" placeholder="25000" required></label>
+        <label>How often
+          <select name="frequency"><option value="monthly">Monthly</option>
+            <option value="quarterly">Every 3 months</option><option value="yearly">Yearly</option></select></label>
+        <label>Day of month <input name="due_day" type="number" min="1" max="31" required></label>
+        <label>Month (yearly only)
+          <select name="month"><option value="">This month</option>
+            {% for n, m in [(1,'Jan'),(2,'Feb'),(3,'Mar'),(4,'Apr'),(5,'May'),(6,'Jun'),(7,'Jul'),(8,'Aug'),(9,'Sep'),(10,'Oct'),(11,'Nov'),(12,'Dec')] %}
+            <option value="{{ n }}">{{ m }}</option>{% endfor %}</select></label>
+        <label>Category
+          <select name="category">{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select></label>
+        <label>Remind (days before) <input name="remind_days" type="number" min="0" max="60" value="2"></label>
+      </div>
+      <button type="submit">Add</button>
+    </form>
+    <p class="muted">Or in the chat box: <em>recurring rent 25000 monthly on 1</em>, <em>due</em>, <em>paid rent</em>.</p>
+  </div>
+{% endblock %}

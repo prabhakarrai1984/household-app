@@ -81,6 +81,41 @@ class ServiceTests(unittest.TestCase):
         db.set_member_active(member_id, False, self.folder)
         self.assertFalse(self.send("milk 60", sender="Asha").ok)
 
+    def test_us14_income_is_recorded_as_income_not_expense(self):
+        reply = self.send("Income 85000 salary")
+        self.assertIn("Recorded income of ₹85,000.00 (Salary)", reply.text)
+        self.assertIn("November 2026: income ₹85,000.00, expenses ₹0.00, balance ₹85,000.00", reply.text)
+        self.assertEqual(db.total_expenses(self.folder), 0)
+        self.assertEqual(db.total_income(self.folder), 85000)
+        row = db.all_expenses(self.folder)[0]
+        self.assertEqual((row["entry_type"], row["category"], row["description"]),
+                         ("Income", "Income", "Salary"))
+
+    def test_income_tax_is_an_expense(self):
+        self.assertIn("Recorded ₹5,000.00 under Uncategorized", self.send("Income tax 5000").text)
+
+    def test_us17_month_command(self):
+        self.send("Income 85000 salary")
+        self.send("vegetables 1000")
+        self.send("petrol 500")
+        self.assertIn("November 2026: income ₹85,000.00, expenses ₹1,500.00, balance ₹83,500.00",
+                      self.send("month").text)
+
+    def test_us22_report_commands(self):
+        self.send("Income 85000 salary")
+        self.send("vegetables 1000")
+        self.send("petrol 500")
+        everything = self.send("report").text
+        self.assertIn("November 2026: income ₹85,000.00, expenses ₹1,500.00", everything)
+        self.assertIn("• Grocery: ₹1,000.00 (67%)", everything)
+        self.assertIn("• Vehicle: ₹500.00 (33%)", everything)
+        self.assertIn("Grocery · November 2026: ₹1,000.00 across 1 entry.", self.send("report grocery").text)
+        self.assertIn("Grocery · October 2026: ₹0.00 across 0 entries.",
+                      self.send("report grocery october").text)
+
+    def test_report_followed_by_an_amount_is_an_expense(self):
+        self.assertIn("Recorded ₹200.00", self.send("report card fees 200").text)
+
     def test_help_command(self):
         self.assertIn("Categories", self.send("help").text)
 
@@ -117,6 +152,33 @@ class WebTests(unittest.TestCase):
         self.assertEqual(download.status_code, 200)
         self.assertEqual(download.data[:2], b"PK")  # .xlsx files are zip files
         download.close()
+
+    def test_reports_page_overview_and_filtered_excel(self):
+        for sender, text in (("Asha", "Income 85000 salary"), ("Asha", "vegetables 1000"),
+                             ("Rahul", "petrol 500")):
+            self.client.post("/api/message", json={"sender": sender, "text": text})
+
+        self.assertIn("₹85,000.00", self.client.get("/").get_data(as_text=True))  # month overview
+
+        page = self.client.get("/reports").get_data(as_text=True)
+        for expected in ("Grocery", "66.7%", "Salary", "Rahul"):
+            self.assertIn(expected, page)
+
+        grocery = self.client.get("/reports?category=Grocery&period=all").get_data(as_text=True)
+        self.assertIn("₹1,000.00", grocery)
+        self.assertNotIn("Petrol", grocery)
+
+        backwards = self.client.get("/reports?period=custom&start=2026-11-10&end=2026-11-01")
+        self.assertIn("start date is after the end date", backwards.get_data(as_text=True))
+
+        download = self.client.get("/reports/export?category=Grocery&period=all")
+        self.assertEqual((download.status_code, download.data[:2]), (200, b"PK"))
+        summary = {row[0]: row[1] for row in load_workbook(io.BytesIO(download.data))["Summary"].values if row[0]}
+        self.assertEqual(summary["Total expenses"], 1000)
+        self.assertNotIn("Total income", summary)
+        download.close()
+
+        self.assertEqual(self.client.get("/reports/export?period=custom").status_code, 400)
 
     def test_family_and_import_pages_end_to_end(self):
         import re
