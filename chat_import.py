@@ -19,7 +19,7 @@ from datetime import date, datetime
 
 import db
 import export
-from message_parser import CATEGORIES, UNCATEGORIZED, ParseError, parse_message
+from message_parser import parse_edit, CATEGORIES, INCOME, UNCATEGORIZED, ParseError, parse_message
 
 MAX_EXPORT_BYTES = 20 * 1024 * 1024
 
@@ -52,6 +52,8 @@ class ImportSummary:
     candidates: int = 0
     likely: int = 0
     already_imported: int = 0
+    undone: int = 0
+    edited: int = 0
     ignored_senders: dict = field(default_factory=dict)  # name -> expense-like messages ignored
 
 
@@ -162,10 +164,41 @@ def stage_import(text, folder=None):
     messages = parse_chat(text)
     summary = ImportSummary(batch_id=uuid.uuid4().hex, messages_read=len(messages))
     occurrences, ignored, rows = Counter(), Counter(), []
+    # Replay in order: each member's entries so far (None = already saved earlier,
+    # so a later undo/edit of it is left alone).
+    history = {}
 
     for message in messages:
         body = _clean_body(message.text)
         if not body or _SKIPPED.match(body):
+            continue
+        command = body.strip().lower()
+        if command == "undo" or command.startswith("edit"):
+            member = db.match_member(message.sender, members)
+            if member is None:
+                continue
+            stack = history.get(member["name"], [])
+            if command == "undo":
+                if stack:
+                    target = stack.pop()
+                    if target is not None:
+                        rows.remove(target)
+                        summary.undone += 1
+            else:
+                try:
+                    changes = parse_edit(body, today=message.when.date())
+                except ParseError:
+                    continue
+                if stack and stack[-1] is not None:
+                    target = stack[-1]
+                    if "amount" in changes:
+                        target["amount"] = changes["amount"]
+                    if "category" in changes and target["entry_type"] != INCOME:
+                        target["category"] = changes["category"]
+                    if "expense_date" in changes:
+                        target["expense_date"] = changes["expense_date"].isoformat()
+                    target["likely"] = True
+                    summary.edited += 1
             continue
         try:
             parsed = parse_message(body, today=message.when.date())
@@ -181,17 +214,21 @@ def stage_import(text, folder=None):
         occurrences[seen] += 1
         if key in saved_keys:
             summary.already_imported += 1
+            history.setdefault(member["name"], []).append(None)
             continue
-        rows.append({
+        row = {
             "source_key": key,
             "expense_date": parsed.expense_date.isoformat(),
             "amount": parsed.amount,
             "category": parsed.category,
+            "entry_type": parsed.entry_type,
             "description": parsed.description,
             "original_text": " ".join(body.split()),
             "added_by": member["name"],
             "likely": _looks_like_expense(body, parsed),
-        })
+        }
+        rows.append(row)
+        history.setdefault(member["name"], []).append(row)
 
     db.stage_candidates(summary.batch_id, rows, folder)
     summary.candidates = len(rows)
@@ -209,11 +246,11 @@ def confirm_import(batch_id, selected_ids, category_overrides=None, folder=None)
         if row["id"] not in selected_ids:
             continue
         category = category_overrides.get(row["id"], row["category"])
-        if category not in allowed:
-            category = row["category"]
+        if category not in allowed or row["entry_type"] == INCOME:
+            category = row["category"]  # income always stays "Income"
         result = db.add_expense(row["amount"], category, row["description"],
                                 date.fromisoformat(row["expense_date"]), row["added_by"],
-                                folder, source_key=row["source_key"])
+                                folder, source_key=row["source_key"], entry_type=row["entry_type"])
         if result is None:
             duplicates += 1
         else:

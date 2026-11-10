@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Reports - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Filter</h2>
+    <form method="get" action="{{ url_for('reports_page') }}">
+      <div class="filters">
+        <label>Period
+          <select name="period">
+            {% for value, text in periods %}
+            <option value="{{ value }}" {% if value == form.get('period', 'month') %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>From (for Custom dates)
+          <input type="date" name="start" value="{{ form.get('start', '') }}">
+        </label>
+        <label>To (for Custom dates)
+          <input type="date" name="end" value="{{ form.get('end', '') }}">
+        </label>
+        <label>Category
+          <select name="category">
+            <option value="">All</option>
+            {% for c in categories %}
+            <option {% if c == form.get('category', '') %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Person
+          <select name="person">
+            <option value="">Everyone</option>
+            {% for p in people %}
+            <option {% if p == form.get('person', '') %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Show
+          <select name="type">
+            {% for value, text in types %}
+            <option value="{{ value }}" {% if value == form.get('type', '') %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit">Show report</button>
+    </form>
+    <p class="muted"><a href="{{ url_for('reports_page') }}">Clear filters</a></p>
+  </div>
+
+  <div class="card">
+    <h2>{{ report.label }}{% if report.category %} &middot; {{ report.category }}{% endif %}{% if report.person %} &middot; {{ report.person }}{% endif %}</h2>
+    <div class="stats">
+      {% if report.show_balance %}
+      <div class="stat"><div class="label">Income</div><div class="value pos">{{ report.income | inr }}</div></div>
+      {% endif %}
+      <div class="stat"><div class="label">Expenses</div><div class="value">{{ report.expenses | inr }}</div></div>
+      {% if report.show_balance %}
+      <div class="stat"><div class="label">Balance</div>
+        <div class="value {{ 'neg' if report.balance < 0 else 'pos' }}">{{ report.balance | inr }}</div></div>
+      {% endif %}
+    </div>
+    <p><a href="{{ url_for('reports_export', **form.to_dict()) }}">Download this report as Excel</a></p>
+  </div>
+
+  {% if report.by_category %}
+  <div class="card">
+    <h2>By category</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Category</th><th class="num">Entries</th><th class="num">Total</th><th class="num">Share</th><th></th></tr>
+      {% for row in report.by_category %}
+      <tr>
+        <td>{{ row.category }}</td>
+        <td class="num">{{ row.entries }}</td>
+        <td class="num">{{ row.total | inr }}</td>
+        <td class="num">{{ row.percent }}%</td>
+        <td><div class="bar"><span style="width: {{ row.percent }}%"></span></div></td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if report.by_person %}
+  <div class="card">
+    <h2>By person</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Person</th><th class="num">Entries</th><th class="num">Total</th><th class="num">Share</th></tr>
+      {% for row in report.by_person %}
+      <tr><td>{{ row.person }}</td><td class="num">{{ row.entries }}</td>
+          <td class="num">{{ row.total | inr }}</td><td class="num">{{ row.percent }}%</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if report.income_sources and report.show_balance %}
+  <div class="card">
+    <h2>Income sources</h2>
+    <div class="table-wrap">
+    <table>
+      <tr><th>Source</th><th class="num">Entries</th><th class="num">Total</th></tr>
+      {% for row in report.income_sources %}
+      <tr><td>{{ row.source }}</td><td class="num">{{ row.entries }}</td><td class="num in">{{ row.total | inr }}</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Entries ({{ report.entries | length }})</h2>
+    {% if report.entries %}
+    <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th>By</th><th class="num">Amount</th><th></th></tr>
+      {% for row in report.entries[:shown_limit] %}
+      <tr>
+        <td>{{ row.expense_date | nicedate }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.added_by }}</td>
+        <td class="num {{ 'in' if row.entry_type == 'Income' }}">{{ '+' if row.entry_type == 'Income' }}{{ row.amount | inr }}</td>
+        <td><a href="{{ url_for('entry_edit_page', entry_id=row.id) }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% if report.entries | length > shown_limit %}
+    <p class="muted">Showing the newest {{ shown_limit }}. The Excel download has all {{ report.entries | length }}.</p>
+    {% endif %}
+    {% else %}
+    <p class="muted">Nothing matches these filters.</p>
+    {% endif %}
+  </div>
+{% endblock %}

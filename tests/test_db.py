@@ -67,6 +67,22 @@ class MigrationTests(unittest.TestCase):
             db.add_expense(5, "Gift", "a", date(2026, 11, 2), "Asha", folder)
             self.assertEqual(db.total_expenses(folder), 560)
 
+    def test_pending_imports_table_from_the_previous_version_is_upgraded(self):
+        with tempfile.TemporaryDirectory() as folder:
+            old = sqlite3.connect(Path(folder) / "household.db")
+            old.execute("""CREATE TABLE import_candidates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id TEXT NOT NULL, source_key TEXT NOT NULL,
+                expense_date TEXT NOT NULL, amount REAL NOT NULL, category TEXT NOT NULL,
+                description TEXT NOT NULL, original_text TEXT NOT NULL, added_by TEXT NOT NULL,
+                likely INTEGER NOT NULL, created_at TEXT NOT NULL)""")
+            old.commit()
+            old.close()
+            db.stage_candidates("b1", [{
+                "source_key": "k", "expense_date": "2026-11-01", "amount": 5, "category": "Income",
+                "description": "x", "original_text": "x", "added_by": "Asha", "likely": True,
+                "entry_type": "Income"}], folder)
+            self.assertEqual(db.staged_rows("b1", folder)[0]["entry_type"], "Income")
+
 
 if __name__ == "__main__":
     unittest.main()

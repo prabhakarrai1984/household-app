@@ -6,15 +6,43 @@
     <p class="muted"><a href="{{ url_for('export_excel') }}">Download Excel file</a></p>
   </div>
 
+  {% if due %}
   <div class="card">
-    <h2>Add an expense</h2>
+    <h2>Due soon</h2>
+    <table>
+      {% for item in due %}
+      <tr>
+        <td class="{{ 'neg' if item.state == 'overdue' }}">{{ item.text }}</td>
+        <td class="num">{{ item.row.amount | inr }}</td>
+        <td><form class="inline" method="post" action="{{ url_for('recurring_paid', recurring_id=item.row.id) }}">
+          <button class="small" type="submit">Mark paid</button></form></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>{{ overview.label }}</h2>
+    <div class="stats">
+      <div class="stat"><div class="label">Income</div><div class="value pos">{{ overview.income | inr }}</div></div>
+      <div class="stat"><div class="label">Expenses</div><div class="value">{{ overview.expenses | inr }}</div></div>
+      <div class="stat"><div class="label">Balance</div>
+        <div class="value {{ 'neg' if overview.balance < 0 else 'pos' }}">{{ overview.balance | inr }}</div></div>
+    </div>
+    <p class="muted">Other months, categories or people: <a href="{{ url_for('reports_page') }}">see Reports</a>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Add an expense or income</h2>
     <form method="post" action="{{ url_for('post_message') }}">
       <input name="sender" placeholder="Your name" value="{{ sender }}" required>
       <input name="text" placeholder="e.g. Spent 450 on vegetables" autocomplete="off" required autofocus>
       <button type="submit">Send</button>
     </form>
     <p class="muted">Try: <em>Medicine 320 yesterday</em> &middot; <em>Gift 1500 birthday</em> &middot;
-      <em>petrol 2000</em> &middot; <em>total</em> &middot; <em>help</em></p>
+      <em>Income 85000 salary</em> &middot; <em>month</em> &middot; <em>report grocery october</em> &middot;
+      <em>undo</em> &middot; <em>edit 500</em> &middot; <em>help</em></p>
   </div>
 
   {% if by_category %}
@@ -36,14 +64,15 @@
     {% if recent %}
     <div class="table-wrap">
     <table>
-      <tr><th>Date</th><th>Description</th><th>Category</th><th>By</th><th class="num">Amount</th></tr>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th>By</th><th class="num">Amount</th><th></th></tr>
       {% for row in recent %}
       <tr>
         <td>{{ row.expense_date | nicedate }}</td>
         <td>{{ row.description }}</td>
         <td>{{ row.category }}</td>
         <td>{{ row.added_by }}</td>
-        <td class="num">{{ row.amount | inr }}</td>
+        <td class="num {{ 'in' if row.entry_type == 'Income' }}">{{ '+' if row.entry_type == 'Income' }}{{ row.amount | inr }}</td>
+        <td><a href="{{ url_for('entry_edit_page', entry_id=row.id) }}">Edit</a></td>
       </tr>
       {% endfor %}
     </table>

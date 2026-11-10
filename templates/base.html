@@ -47,6 +47,14 @@
   .table-wrap { overflow-x: auto; }
   .badge { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: var(--okbg); color: var(--ok); }
   .badge.off { background: var(--errbg); color: var(--err); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+  .stat .label { color: var(--muted); font-size: 0.85rem; }
+  .stat .value { font-size: 1.3rem; font-weight: 700; }
+  .pos, .in { color: var(--ok); }
+  .neg { color: var(--err); }
+  .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .bar { background: var(--line); height: 6px; border-radius: 3px; min-width: 70px; }
+  .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
   a { color: var(--accent); }
   ol { padding-left: 20px; }
 </style>
@@ -56,6 +64,9 @@
   <h1>Household App</h1>
   <nav>
     <a href="{{ url_for('home') }}" {% if request.endpoint == 'home' %}class="active"{% endif %}>Home</a>
+    <a href="{{ url_for('entries_page') }}" {% if request.endpoint in ('entries_page', 'entry_edit_page', 'entry_edit_save') %}class="active"{% endif %}>Entries</a>
+    <a href="{{ url_for('recurring_page') }}" {% if request.endpoint == 'recurring_page' %}class="active"{% endif %}>Recurring</a>
+    <a href="{{ url_for('reports_page') }}" {% if request.endpoint == 'reports_page' %}class="active"{% endif %}>Reports</a>
     <a href="{{ url_for('import_page') }}" {% if request.endpoint in ('import_page', 'import_upload') %}class="active"{% endif %}>Import chat</a>
     <a href="{{ url_for('members_page') }}" {% if request.endpoint == 'members_page' %}class="active"{% endif %}>Family</a>
   </nav>

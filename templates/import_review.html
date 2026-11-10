@@ -31,13 +31,17 @@
           <td>{{ row.expense_date | nicedate }}</td>
           <td>{{ row.added_by }}</td>
           <td>{{ row.original_text }}</td>
-          <td class="num">{{ row.amount | inr }}</td>
+          <td class="num {{ 'in' if row.entry_type == 'Income' }}">{{ '+' if row.entry_type == 'Income' }}{{ row.amount | inr }}</td>
           <td>
+            {% if row.entry_type == 'Income' %}
+              Income
+            {% else %}
             <select name="category_{{ row.id }}">
               {% for category in categories %}
               <option {% if category == row.category %}selected{% endif %}>{{ category }}</option>
               {% endfor %}
             </select>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

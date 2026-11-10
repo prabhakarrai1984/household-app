@@ -142,6 +142,20 @@ class ImportFlowTests(unittest.TestCase):
         again, rows_again = self.stage(text)
         self.assertEqual((again.already_imported, len(rows_again)), (2, 0))
 
+    def test_income_in_a_chat_is_imported_as_income(self):
+        text = ("05/11/26, 9:00 am - Asha: Income 85000 salary\n"
+                "05/11/26, 9:05 am - Asha: milk 60")
+        summary, rows = self.stage(text)
+        income = rows[0]
+        self.assertEqual((income["entry_type"], income["category"], income["amount"], income["description"],
+                          bool(income["likely"])), ("Income", "Income", 85000, "Salary", True))
+        # even if someone picks a category for it on the review page, income stays income
+        saved, _ = chat_import.confirm_import(summary.batch_id, {r["id"] for r in rows},
+                                              {income["id"]: "Gift"}, self.folder)
+        self.assertEqual(saved, 2)
+        self.assertEqual((db.total_income(self.folder), db.total_expenses(self.folder)), (85000, 60))
+        self.assertEqual({r["category"] for r in db.all_expenses(self.folder)}, {"Income", "Grocery"})
+
     def test_paused_member_is_ignored(self):
         asha = next(m for m in db.list_members(self.folder) if m["name"] == "Asha")
         db.set_member_active(asha["id"], False, self.folder)

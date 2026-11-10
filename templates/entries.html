@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Entries - Household App{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2>Find an entry</h2>
+    <form method="get" action="{{ url_for('entries_page') }}">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search description, category or person">
+      <button type="submit">Search</button>
+    </form>
+    <p class="muted">Fix a wrong amount, category, date or description, or delete a mistake. Every change is
+      kept in the log below.</p>
+  </div>
+
+  <div class="card">
+    <h2>{{ 'Matching entries' if q else 'Newest entries' }}</h2>
+    {% if rows %}
+    <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Description</th><th>Category</th><th>By</th><th class="num">Amount</th><th></th></tr>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.expense_date | nicedate }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.added_by }}</td>
+        <td class="num {{ 'in' if row.entry_type == 'Income' }}">{{ '+' if row.entry_type == 'Income' }}{{ row.amount | inr }}</td>
+        <td>
+          <a href="{{ url_for('entry_edit_page', entry_id=row.id) }}">Edit</a>
+          <form class="inline" method="post" action="{{ url_for('entry_delete', entry_id=row.id) }}"
+                onsubmit='return confirm({{ ("Delete " ~ (row.amount | inr) ~ " " ~ row.description ~ "?") | tojson }})'>
+            <button class="small secondary" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% if more %}
+    <p class="muted">Showing the newest 100. Use the search box to narrow it down.</p>
+    {% endif %}
+    {% else %}
+    <p class="muted">{{ 'Nothing matches that search.' if q else 'No entries yet.' }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Recent changes</h2>
+    {% if changes %}
+    <ul>
+      {% for change in changes %}
+      <li>{{ change.changed_at | nicetime }} &middot; {{ change.changed_by }}: {{ change | describe_change }}</li>
+      {% endfor %}
+    </ul>
+    <p class="muted">If you deleted something by mistake, add it again from the home page.</p>
+    {% else %}
+    <p class="muted">No edits or deletions yet.</p>
+    {% endif %}
+  </div>
+{% endblock %}

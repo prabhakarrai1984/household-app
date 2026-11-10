@@ -4,7 +4,8 @@ A family expense tracker. Family members send short messages like
 `Spent 450 on vegetables`, and the app records the amount, picks a category,
 keeps a running total, and stores everything in a database plus an Excel file.
 
-**Status:** MVP plus family list and WhatsApp chat import.
+**Status:** expenses, income, reports, undo/edit, chat import and recurring expenses.
+This Flask version is the working prototype and rulebook for the planned on-device Android app.
 Messages can be typed into the web page, or imported from an exported WhatsApp chat.
 
 ## Run it
@@ -25,13 +26,38 @@ Open http://127.0.0.1:5000.
 python -m unittest -v
 ```
 
-## The three pages
+## The pages
 
 | Page | What it does |
 |---|---|
-| **Home** | Total expenses, totals by category, recent entries, Excel download, and a box to type a message. |
-| **Family** | Who counts. Add each family member once. Anyone not on the list is ignored. |
+| **Home** | Total expenses (all time), this month's income, expenses and balance, a box to type a message, recent entries. |
+| **Entries** | Search every entry, fix a wrong amount, category, date or description, or delete a mistake. Shows a log of recent changes. |
+| **Reports** | Filter by period, category, person and type. Shows totals, category shares, who spent what, income sources, and downloads the result as Excel. |
 | **Import chat** | Upload an exported WhatsApp chat, review what was found, tick what to keep. |
+| **Recurring** | Rent, EMIs, insurance. Add once; they show under **Due soon** on Home from a few days before the due date. **Mark paid** records the expense and moves the date on. |
+| **Family** | Who counts. Add each family member once. Anyone not on the list is ignored. |
+
+### Income and the monthly view
+
+Start a message with `Income` (or `Salary`) to record money coming in:
+`Income 85000 salary`, `Income 5000 rent received`, `salary 85000`.
+Income is never mixed into expense totals. The text after the amount becomes the *source*, which the
+Reports page uses for the income breakdown. (`Income tax 5000` and `Maid salary 8000` are still expenses.)
+
+Home shows **income, expenses and balance for the current month**; the balance turns red when you spend
+more than you earned.
+
+### Reports
+
+- **Period:** this month, last month, this week (Monday to Sunday), today, this year, all time, or custom dates.
+- **Filters:** category, person, and whether to show expenses, income or both.
+- **Shows:** income, expenses, balance, each category's total and share of spending, spending per person,
+  income sources, and the matching entries.
+- **Download this report as Excel:** a *Summary* sheet and an *Entries* sheet, for exactly what you filtered.
+  (`data/expenses.xlsx` is separate and always holds everything.)
+
+You can also ask from the chat box: `month`, `report`, `report grocery`, `report grocery october`,
+`report last month`, `report travel this year`, `report all`.
 
 ### Family list
 
@@ -65,6 +91,45 @@ on the Family page first).
 > Note: if the same expense was both typed into the web page *and* appears in an imported chat,
 > it is counted twice, because the app cannot tell they are the same. Pick one way per expense.
 
+### Undo and edit inside an imported chat
+
+The importer replays the chat in order. If Asha posted `Spent 700 on medicine`, then `edit 750`,
+you get one entry of 750. If she posted something and then `undo`, it is simply not offered.
+(An `undo` aimed at something imported earlier is ignored rather than guessed at.)
+
+## Recurring expenses
+
+| Message | What happens |
+|---|---|
+| `recurring rent 25000 monthly on 1` | Adds it. Also `quarterly`, `yearly` (`recurring LIC 24000 yearly on 5 march`). |
+| `recurring electricity 1800 monthly on the 15th remind 3` | Reminder starts 3 days before (default 2). |
+| `due` | Lists what is due soon or overdue. |
+| `paid rent` | Records the expense, moves the due date on, and gives you a line to post to the group. |
+| `recurring` / `recurring remove rent` | List or stop them. |
+
+A day that does not exist in a month moves to the month's last day (the 31st becomes 28 Feb, then 31 Mar again).
+The Recurring page also shows a ready-made reminder line to paste into the family group.
+
+## Fixing mistakes
+
+**In the chat box**, `undo` and `edit` act on *your own most recent entry*:
+
+| Message | What happens |
+|---|---|
+| `undo` | Removes your last entry and tells you exactly what it removed. Repeat to go back further. |
+| `edit 500` | Changes the amount of your last entry. |
+| `edit grocery` | Changes its category. |
+| `edit 500 grocery` | Changes both. |
+| `edit yesterday` | Changes its date (`edit today` works too). |
+
+Entries that came from an imported WhatsApp chat are never touched by `undo` or `edit`.
+
+**On the Entries page** you can find any entry (search by description, category or person), change its
+date, amount, category and description, or delete it. Every edit and deletion is written to a
+**Recent changes** log on that page. Changes made on the web are logged as "Web page", because there are
+no logins yet. If you delete an entry that came from an imported chat, the import remembers and won't
+offer it again.
+
 ## What you can type
 
 | Message | Result |
@@ -74,6 +139,7 @@ on the Family page first).
 | `Gift 1500 birthday` | ₹1,500, Gift (a category name always wins) |
 | `petrol 2,000` / `₹2k fuel` | ₹2,000, Vehicle |
 | `total` | Shows total expenses so far |
+| `undo` / `edit 500` | Remove or correct your last entry (see above) |
 | `help` | Shows examples |
 
 Categories: Investment, Grocery, Medicine, School Fees, Study, Entertainment,
@@ -84,9 +150,11 @@ Clothes, Travel, Vehicle, Gift. Anything else is saved as *Uncategorized*.
 | File | Job |
 |---|---|
 | `message_parser.py` | Reads a message: amount, date, category. Edit the `KEYWORDS` list to teach it your family's words. |
+| `recurring.py` | Recurring expenses: due-date rules, Due soon, paid, share text. |
 | `chat_import.py` | Reads WhatsApp exports and prepares entries for review. |
 | `db.py` | SQLite storage: expenses, family members, pending imports. Upgrades older databases automatically. |
-| `export.py` | Rebuilds `data/expenses.xlsx` from the database. |
+| `export.py` | Rebuilds `data/expenses.xlsx` from the database, and builds the downloadable filtered report. |
+| `reports.py` | Date ranges, filters, summaries and the `report ...` chat command. |
 | `service.py` | `handle_message()`: ties it together. WhatsApp or Telegram will call this too. |
 | `app.py` + `templates/` | The Flask web pages and the `/api/message` endpoint. |
 | `samples/` | Example exports (Android and iPhone style) for trying the import. |
@@ -100,8 +168,13 @@ US-1 record by message, US-2 "yesterday", US-3 error reply, US-5 who posted,
 US-6 auto-category, US-7 explicit category, US-16 total at all times, US-23 Excel storage,
 US-26 only listed family members can post (family list), plus WhatsApp chat import.
 
+Phase 2: US-14 record income, US-15 monthly income, US-17 income vs expenses for the month,
+US-18 filter by category, US-19 filter by duration, US-20 filter by person, US-21 category summary
+with percentages, US-22 reports by chat command, US-24 export filtered data to Excel.
+
+Also: US-4 undo and edit your last entry, plus editing and deleting any entry on the web.
+
 ## Roadmap
 
-1. **Phase 2:** income, monthly view, filters and reports, Excel export of filtered data
-2. **Phase 3:** recurring expenses and reminders
-3. **Phase 4:** live Telegram or WhatsApp connection, backups, login
+1. **Next:** port the core rules to Java and build the Android app (data stays on each person's phone)
+2. **Later:** editing categories and keywords in the app
