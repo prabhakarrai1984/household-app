@@ -12,6 +12,7 @@ import * as grocery from './core/grocery.js';
 import * as food from './core/food.js';
 import { scanBill } from './ocr.js';
 
+export const VERSION = '2026-11-11 · Kitchen (grocery + meals)';
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
 const ui = { bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
@@ -189,7 +190,7 @@ screens.more = () => `<div class="card">
   <div class="card"><h2>Your name</h2><form data-form="set-me" class="row"><input name="me" value="${esc(state.settings.me)}" placeholder="As shown in WhatsApp" required><button>Save</button></form>
   <label class="row" style="margin-top:12px"><input type="checkbox" data-act="toggle-share" ${state.settings.shareAfterSave ? 'checked' : ''}> <span>Offer "Share to group chat" after saving</span></label></div>
   ${ui.install ? '<div class="card"><button data-act="install">Install on this phone</button></div>' : ''}
-  <div class="card"><h2>About</h2><p class="muted">Your data is stored only on this phone. The WhatsApp group chat is the shared record: post expenses there, and anyone who wants the full picture imports the exported chat here.</p></div>`;
+  <div class="card"><h2>About</h2><p class="muted">Version ${esc(VERSION)}<br>Your data is stored only on this phone. The WhatsApp group chat is the shared record: post expenses there, and anyone who wants the full picture imports the exported chat here.</p></div>`;
 
 screens.import = () => {
   const st = ui.staged;

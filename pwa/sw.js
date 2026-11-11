@@ -1,16 +1,19 @@
-// Offline support. Files are served from the phone's cache and refreshed quietly in the background,
-// so a new version arrives the next time the app is opened. No user data ever passes through here,
-// except that a chat file shared TO the app is parked briefly so the app can read it.
-const CACHE = 'household-shell';
+// Offline support. When the phone is online the app always asks the server for the newest files (so an update shows up
+// on the next open), and falls back to the saved copy when offline or when the network is very slow.
+// No user data ever passes through here, except that a chat file shared TO the app is parked briefly so the app can read it.
+const CACHE = 'household-shell-v3';   // change this name to throw away every old saved copy
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './core/dates.js', './core/format.js', './core/parser.js', './core/store.js', './core/recurring.js',
   './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js'];
 
 self.addEventListener('install', (e) => {
   // one missing file must not stop the app from installing, so add them individually
-  e.waitUntil(caches.open(CACHE).then((c) => Promise.allSettled(SHELL.map((f) => c.add(f)))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.allSettled(SHELL.map((f) => c.add(new Request(f, { cache: 'reload' }))))).then(() => self.skipWaiting()));
 });
-self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
+self.addEventListener('activate', (e) => {
+  const keep = [CACHE, 'household-shared', 'household-reader'];
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => !keep.includes(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+});
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -44,8 +47,12 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(req, { ignoreSearch: true });
-    const network = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-    return cached || (await network) || new Response('Offline', { status: 503 });
+    try {
+      const fresh = await Promise.race([fetch(req.url, { cache: 'no-cache' }), new Promise((_, no) => setTimeout(no, 4000))]);
+      if (fresh.ok) cache.put(req, fresh.clone());
+      return fresh;
+    } catch {
+      return (await cache.match(req, { ignoreSearch: true })) || new Response('Offline', { status: 503 });
+    }
   })());
 });
