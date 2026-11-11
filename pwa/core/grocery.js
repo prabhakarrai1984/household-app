@@ -95,6 +95,8 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 /** Finds the bill date in the text, or returns `fallback` (today). Day-first, as in India. */
 export function findBillDate(text, fallback) {
+  const labelled = /\b(?:invoice|bill)\s*date\s*:?\s*(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})/i.exec(text);
+  if (labelled) text = labelled[1];
   let m = /\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b/.exec(text);
   if (m) {
     let y = Number(m[3]); if (y < 100) y += 2000;
@@ -111,10 +113,10 @@ export function findBillDate(text, fallback) {
 const titleCase = (s) => s.replace(/\s+/g, ' ').trim().replace(/(^|\s)([a-z])/g, (_, a, b) => a + b.toUpperCase());
 
 /** One bill line -> {name, qty, unit, price} (qty/unit as printed, e.g. 5 kg), or null if it isn't an item. */
-export function parseBillLine(raw) {
+export function parseBillLine(raw, { table = false } = {}) {
   let line = String(raw || '').replace(/[₹]/g, ' ').replace(/\brs\.?\s*(?=\d)/gi, ' ').trim();
   line = line.replace(/^\s*\d{1,3}\s*[.)\-:]\s+/, '');                      // "1. Atta ..." serial numbers
-  if (!/[A-Za-z]{2,}/.test(line) || SKIP.test(line)) return null;
+  if (!/[A-Za-z]{2,}/.test(line) || (!table && SKIP.test(line))) return null;
   line = line.replace(/\d[\d.]*\s*\/\s*(?:kg|g|l|ltr|ml|pc|pcs)\b/gi, ' ').replace(/@/g, ' '); // "30/kg" rates
 
   let count = 1, qty = null, unit = null, sized = false;
@@ -147,9 +149,37 @@ export function parseBillLine(raw) {
   return { name, qty: outQty, unit: outUnit, price };
 }
 
+// A GST tax-invoice row (DMart and others): "1.  08023200  2  Bazana Walnut Kernels 250g  2.0  352.00  704.00"
+//   = serial, HSN code, tax class, item (with pack size), packs bought, rate, value.
+const TABLE_ROW = /^\s*\d{1,3}\s*\.\s+(\d{4,8})\s+\d\s+(.+?)\s+(\d+(?:\.\d+)?)\s+(\d[\d,]*(?:\.\d+)?)\s+(\d[\d,]*(?:\.\d+)?)\s*$/;
+const num = (v) => Number(String(v).replace(/,/g, ''));
+/** One invoice-table row -> an item line (food and household things alike), null if it isn't one. */
+export function parseTableRow(raw) {
+  const m = TABLE_ROW.exec(String(raw || '').replace(/\s{2,}/g, ' '));
+  if (!m) return null;
+  const [, , name, count, rate, value] = m;
+  const item = parseBillLine(`${name} ${num(count)} ${num(rate)} ${num(value)}`, { table: true });
+  if (!item) return null;
+  return { ...item, price: num(value) };
+}
+
 /** Whole bill text -> {date, lines, skipped}. The person reviews every line before it is saved. */
 export function parseBill(text, { today }) {
   const lines = [], skipped = [];
+  const rows = String(text || '').split(/\r?\n/).map((r) => ({ r, t: parseTableRow(r) }));
+  if (rows.filter((x) => x.t).length >= 2) {   // it is a tax invoice: read only the item table, ignore addresses, totals and headers
+    // some invoices print the item table twice (a second copy in another order); "TOTAL ITEMS: 56" says how many are real
+    const declared = Number(/total\s+items\s*:?\s*(\d+)/i.exec(text)?.[1]);
+    const tableRows = rows.filter((x) => x.t);
+    if (declared && tableRows.length === declared * 2) {
+      const sig = (r) => r.replace(/^\s*\d+\s*\./, '').replace(/\d+\.0\b/g, (n) => n.replace('.0', '')).replace(/\.00\b/g, '').replace(/,/g, '').replace(/\s+/g, ' ').trim();
+      const seen = new Map(), keep = new Set();
+      for (const x of tableRows) { const k = sig(x.r); seen.set(k, (seen.get(k) || 0) + 1); if (seen.get(k) % 2 === 1) keep.add(x); }
+      if (keep.size === declared) { for (const x of tableRows) if (!keep.has(x)) x.t = null; }
+    }
+    for (const { r, t } of rows) { if (t) lines.push({ name: t.name, qty: t.qty, unit: t.unit, price: t.price, raw: r.trim() });; }
+    return { date: findBillDate(text, today), lines, skipped };
+  }
   for (const raw of String(text || '').split(/\r?\n/)) {
     if (!raw.trim()) continue;
     // an item line has a price or a quantity; a line of words only is a shop name or a footer

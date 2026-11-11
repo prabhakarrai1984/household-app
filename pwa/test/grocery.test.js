@@ -151,3 +151,22 @@ test('items without quantities still learn how often they are bought', () => {
   const item = monthlyList(s, '2026-10-25').items.find((i) => i.key === 'tomato');
   assert.ok(item); assert.equal(item.qty, null);
 });
+
+test('DMart-style tax invoice: reads only the item table, keeps household items too, ignores the address number', () => {
+  const text = [
+    'INVOICE DATE: 25/10/26  CUSTOMER NAME: Someone', 'ORDER DATE: 24/10/26', 'DELIVERY ADDRESS: 381, Villa, Pune 412207', 'TOTAL ITEMS: 3',
+    '1.  08023200  2  Bazana Walnut Kernels 250g   2.0   352.00   704.00',
+    '2.  33061020  2  Colgate Strawberry Flavor Tp-40G   1.0   93.00   93.00',
+    '3.  10063020  2  Daawat Premium Rice 5Kgs   2.0   545.00   1,090.00',
+    'Sub Total 1,887.00',
+  ].join('\n');
+  const r = parseBill(text, { today: '2026-11-11' });
+  assert.equal(r.date, '2026-10-25');                      // the invoice date, not the order date
+  assert.equal(r.lines.length, 3);                         // toothpaste counts too: it is part of the household
+  assert.deepEqual([r.lines[0].name, r.lines[0].qty, r.lines[0].unit, r.lines[0].price], ['Bazana Walnut Kernels', 500, 'g', 704]);
+  assert.deepEqual([r.lines[2].name, r.lines[2].qty, r.lines[2].unit, r.lines[2].price], ['Daawat Premium Rice', 10, 'kg', 1090]);
+  // the same table printed twice (second copy in another order, one-decimal prices) counts once
+  const twice = text.replace('TOTAL ITEMS: 3', 'TOTAL ITEMS: 3') + '\n' + [
+    '1.  10063020  2  Daawat Premium Rice 5Kgs   2.0   545.0   1090.0', '2.  08023200  2  Bazana Walnut Kernels 250g   2.0   352.0   704.0', '3.  33061020  2  Colgate Strawberry Flavor Tp-40G   1.0   93.0   93.0'].join('\n');
+  assert.equal(parseBill(twice, { today: '2026-11-11' }).lines.length, 3);
+});
