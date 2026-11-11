@@ -13,7 +13,7 @@ import * as food from './core/food.js';
 import { scanBill } from './ocr.js';
 import { readPdf } from './pdfbill.js';
 
-export const VERSION = '2026-11-11 · Kitchen + PDF bills (all items)';
+export const VERSION = 'Build 4 · 2026-11-11 · DMart invoices read, all items kept';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept. Add 1 on every change.
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
 const ui = { bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
