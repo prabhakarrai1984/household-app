@@ -5,12 +5,15 @@ import { inr } from './format.js';
 import { niceDate } from './dates.js';
 import { buildReport, monthOverview, parseReportCommand, totalExpenses } from './reports.js';
 import * as rec from './recurring.js';
+import { addMeal, alertText, foodAlerts, parseMeal } from './food.js';
+import { analyze } from './grocery.js';
 
 export const HELP_TEXT = [
   'Send a message with an amount, for example:',
   '• Spent 450 on vegetables', '• Medicine 320 yesterday', '• Gift 1500 birthday', '• Income 85000 salary',
   'Commands: total, month, report grocery october, undo, edit 500, help',
   'Recurring: recurring rent 25000 monthly on 1 · due · paid rent · recurring remove rent',
+  'Meals: lunch dal rice at home · dinner outside pizza · breakfast yesterday poha',
 ].join('\n');
 
 const reply = (text, ok = true, extra = {}) => ({ text, ok, ...extra });
@@ -107,6 +110,16 @@ export function handleMessage(state, text, sender, today) {
   if (isReportCommand(command)) {
     try { return reply(reportReply(buildReport(state, { today, ...parseReportCommand(command, today, categories) }))); }
     catch (e) { return reply(e.message, false); }
+  }
+
+  let meal = null;
+  try { meal = parseMeal(text, { today }); } catch (e) { if (e instanceof ParseError) return reply(e.message, false); throw e; }
+  if (meal) {
+    addMeal(state, { ...meal, addedBy: sender });
+    const stockKeys = analyze(state, today, state.settings.people || 4).filter((a) => (a.remaining ?? a.daysLeft ?? 0) > 0).map((a) => a.key);
+    const alerts = foodAlerts(state, today, { stockKeys }).slice(0, 2);
+    const where = meal.place === 'Home' ? 'at home' : meal.place === 'Ordered' ? 'ordered in' : 'outside';
+    return reply([`Logged ${meal.meal.toLowerCase()} (${where}): ${meal.dish}.`, ...alerts.map((a) => '⚠ ' + alertText(a))].join('\n'), true, { changed: true });
   }
 
   let parsed;

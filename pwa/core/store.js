@@ -8,7 +8,8 @@ export function newState() {
     version: 1, nextId: 1,
     categories: structuredClone(DEFAULT_CATEGORIES),
     members: [], entries: [], ignoredKeys: [], recurring: [], changes: [],
-    settings: { me: '', shareAfterSave: true },
+    bills: [], purchases: [], finished: [], meals: [], foodWords: { healthy: [], less: [] },
+    settings: { me: '', shareAfterSave: true, people: 4 },
   };
 }
 

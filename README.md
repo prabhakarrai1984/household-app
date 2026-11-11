@@ -177,4 +177,5 @@ Also: US-4 undo and edit your last entry, plus editing and deleting any entry on
 ## Roadmap
 
 1. **Now:** phone web app in `pwa/` (install from the browser, data on the phone, your own categories)
-2. **Next:** native Android app (real alarm reminders, Google Play)
+2. **Also in `pwa/`:** Kitchen (grocery bills, consumption analysis, monthly list, meal log with alerts and ideas)
+3. **Next:** native Android app (real alarm reminders, Google Play)
