@@ -7,7 +7,10 @@ const assert = require('node:assert/strict');
 const ROOT = path.resolve(__dirname, '..');
 const SHOTS = process.argv[2];
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+const overrides = {};   // lets a test pretend the server was updated
 const server = http.createServer((req, res) => {
+  const op = new URL(req.url, 'http://x').pathname;
+  if (overrides[op]) { res.writeHead(200, { 'content-type': 'text/javascript' }).end(overrides[op]); return; }
   let p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
   if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
   if (!p.startsWith(ROOT) || !fs.existsSync(p)) { res.writeHead(404).end(); return; }
@@ -125,6 +128,15 @@ const server = http.createServer((req, res) => {
   await context.setOffline(true); await page.reload();
   assert.equal(await page.locator('.total').innerText(), totalBefore); await context.setOffline(false);
   step('data survives reload; app opens offline');
+
+  // an update on the server shows up on the very next open (not after several), and offline still works afterwards
+  overrides['/app.js'] = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8') + '\nwindow.__updated = true;';
+  await page.reload(); await page.waitForSelector('.total');
+  assert.equal(await page.evaluate(() => window.__updated === true), true);
+  delete overrides['/app.js']; await context.setOffline(true); await page.reload(); await page.waitForSelector('.total');
+  assert.equal(await page.evaluate(() => window.__updated === true), true);   // still the newest saved copy
+  await context.setOffline(false);
+  step('an update shows on the next open; offline falls back to the newest saved copy');
 
   // backup + restore
   await page.goto(base + 'index.html#backup');
