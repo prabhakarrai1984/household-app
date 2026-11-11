@@ -52,3 +52,14 @@ a { color: var(--accent); }
 #toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #111; color: #fff; padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 9; }
 #toast.show { opacity: .95; }
 input[type=file] { width: 100%; max-width: 100%; }
+
+nav#tabs a { font-size: 0.66rem; padding-left: 0; padding-right: 0; }
+.seg { display: flex; gap: 6px; margin-bottom: 12px; }
+.seg a { flex: 1; text-align: center; padding: 9px; border-radius: 10px; border: 1px solid var(--line); text-decoration: none; color: var(--muted); font-weight: 600; background: var(--card); }
+.seg a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+details { border-bottom: 1px solid var(--line); padding: 8px 0; } details:last-child { border-bottom: 0; }
+summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.billrow { display: grid; grid-template-columns: 1fr 64px 64px 72px 34px; gap: 6px; margin-bottom: 8px; align-items: center; }
+.billrow input, .billrow select { padding: 8px 6px; width: 100%; }
+.billhead { display: grid; grid-template-columns: 1fr 64px 64px 72px 34px; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+.alert { border-left: 4px solid var(--err); } .alert.info { border-left-color: var(--accent); }

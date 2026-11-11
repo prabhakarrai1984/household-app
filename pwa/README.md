@@ -46,6 +46,34 @@ category / person, undo and edit, recurring expenses with a Due soon list, chat 
 New: **add your own categories** and edit the keywords of any category (More → Categories). Keywords can be in
 any language, for example Hindi words.
 
+## Kitchen: grocery and meals
+
+**Grocery** (Kitchen → Grocery)
+- **Add a bill:** paste the bill text (BigBasket, Blinkit, DMart emails or messages), type one item per line
+  (`Atta 5kg 250`), or tap **Scan photo**. You always get a check screen to fix names, quantities and prices
+  before anything is saved. Totals, tax and headings are skipped.
+- **How fast things are used:** when you buy an item again, the app works out how many days the last pack lasted
+  and compares it with your earlier gaps. It says "used faster than usual" or "lasted longer", and for staples like
+  oil, sugar, milk, atta, rice, dal and salt it also compares with a rough per-person range (set *People at home*).
+  Tap **It ran out today** on an item to make the count exact.
+- **Next 30 days:** a suggested list with quantities in your usual pack sizes and an estimated cost. Share it to WhatsApp.
+- Needs an item bought at least twice. Stock-ups and top-ups before something runs out can look like "faster than usual";
+  the app says so in the message.
+
+**Meals** (Kitchen → Meals, or type in the Home box: `lunch dal rice at home`, `dinner outside pizza`)
+- Log breakfast, lunch, snacks and dinner as at home, outside or ordered in.
+- Gentle alerts: too many meals outside or ordered in during the last 7 days, several heavier or fried meals in a row,
+  and the same dish again and again (roti, rice, dal and similar daily staples are ignored).
+- Each alert comes with ideas for something different from a built-in list of everyday Indian dishes. Ideas skip
+  anything you had this week and favour dishes that use groceries you probably still have. Choose vegetarian,
+  vegetarian + eggs, or anything. Thresholds and your own lighter/heavier food words are editable.
+- These are simple word-based rules for everyday awareness, **not medical or dietary advice**.
+
+**Photo scanning, honestly:** the bill-photo reader (Tesseract.js) is downloaded once from a public library host the first
+time you scan, then kept for offline use. The photo itself never leaves your phone. Reading crumpled receipts is
+imperfect, so always check the lines. I could not test the real reader on a bill photo here (no internet in my workspace),
+so please try it and tell me how it does. Typing or pasting always works.
+
 ## Things to know
 
 - **Back up.** Data lives only in this browser on this phone. Clearing browser data, uninstalling or changing
@@ -61,7 +89,7 @@ No build step and no dependencies: plain JavaScript modules.
 
 ```bash
 cd pwa
-node --test test/core.test.js     # rules: parser, import, recurring, reports (needs Node 20+)
+node --test test/core.test.js test/grocery.test.js test/food.test.js   # the rules (needs Node 20+)
 python -m http.server 8000        # then open http://localhost:8000/pwa/ from the repo root
 ```
 

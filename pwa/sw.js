@@ -4,7 +4,7 @@
 const CACHE = 'household-shell';
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './core/dates.js', './core/format.js', './core/parser.js', './core/store.js', './core/recurring.js',
-  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js'];
+  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js'];
 
 self.addEventListener('install', (e) => {
   // one missing file must not stop the app from installing, so add them individually
@@ -26,6 +26,18 @@ self.addEventListener('fetch', (event) => {
         }
       } catch { /* fall through to the app */ }
       return Response.redirect(new URL('./?shared=1', self.registration.scope).href, 303);
+    })());
+    return;
+  }
+  // the bill-photo reader comes from a public library host once, then is kept for offline use
+  if (req.method === 'GET' && url.hostname === 'cdn.jsdelivr.net') {
+    event.respondWith((async () => {
+      const cache = await caches.open('household-reader');
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
+      return res;
     })());
     return;
   }

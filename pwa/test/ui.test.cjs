@@ -19,6 +19,9 @@ const server = http.createServer((req, res) => {
   const base = `http://localhost:${server.address().port}/`;
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 1, acceptDownloads: true, serviceWorkers: 'allow' });
+  await context.addInitScript(() => {   // stand-in for the downloaded text reader: tests the wiring, not the OCR itself
+    window.Tesseract = { createWorker: async () => ({ recognize: async () => ({ data: { text: 'BIG MART\nDate 01/03/2026\nSugar 1kg 48\nBanana 1 dozen 60\nTotal 108' } }), terminate: async () => {} }) };
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -139,6 +142,74 @@ const server = http.createServer((req, res) => {
     await c.put('shared-chat', new Response('10/11/26, 9:00 am - Asha: Spent 77 on milk', { headers: { 'x-filename': 'chat.txt' } })); return true; });
   await page.goto(base + 'index.html?shared=1'); await page.waitForSelector('form[data-form=confirm-import]');
   assert.match(await text(), /77|Milk/); step('chat shared to the app opens the import review');
+
+  // ---------------------------------------------------------------- kitchen: grocery
+  const dayOffset = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  await page.goto(base + 'index.html#kitchen');
+  assert.match(await text(), /Add a grocery bill/);
+  const saveBill = async (billText, date) => {
+    await page.fill('#billtext', billText); await page.click('form[data-form=read-bill] button:not([type=button])');
+    await page.waitForSelector('form[data-form=save-bill]');
+    await page.fill('form[data-form=save-bill] input[name=date]', date);
+    await page.click('form[data-form=save-bill] > .row:last-of-type button:first-child');
+    await page.waitForSelector('form[data-form=read-bill]'); await page.waitForTimeout(80);
+  };
+  await page.fill('#billtext', 'BIG MART\nInvoice 55   Date 05/11/2026\n1. Aashirvaad Atta 5kg 250.00\n2. Amul Milk 500ml 2 28.00 56.00\nSub Total 306\nGST 0');
+  await page.click('form[data-form=read-bill] button:not([type=button])'); await page.waitForSelector('form[data-form=save-bill]');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Aashirvaad Atta');
+  assert.equal(await page.inputValue('form[data-form=save-bill] select[name=unit0]'), 'kg');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-11-05');
+  await page.click('button[data-act=bill-add-line]');                                      // edits survive adding a line
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Aashirvaad Atta');
+  await page.click('button[data-act=bill-del-line][data-i="2"]');
+  await page.fill('form[data-form=save-bill] input[name=date]', dayOffset(-60));
+  await page.click('form[data-form=save-bill] > .row:last-of-type button:first-child');
+  await page.waitForSelector('form[data-form=read-bill]'); await page.waitForTimeout(80);
+  assert.match(await text(), /Your items/); assert.match(await text(), /Atta/);
+  await saveBill('Atta 5kg 250\nMilk 500ml 28', dayOffset(-35));
+  await saveBill('Atta 5kg 250\nMilk 500ml 28', dayOffset(-10));
+  const kitchen = await text();
+  assert.match(kitchen, /Next 30 days: what to buy/); assert.match(kitchen, /Atta/);
+  await page.click('details:has-text("Atta") summary'); assert.match(await text(), /Lasted 25 days/);
+  await page.fill('input[data-act=people]', '2'); await page.dispatchEvent('input[data-act=people]', 'change');
+  assert.match(await page.locator('input[data-act=people]').inputValue(), /2/);
+  step('grocery: paste bill, check lines, save, learn from repeat purchases, monthly list');
+
+  // photo scan wiring (the reader is a stand-in here; real scanning needs the library and a real bill photo)
+  const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 300; c.height = 200; const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, 300, 200); x.fillStyle = '#000'; x.font = '20px sans-serif'; x.fillText('Sugar 1kg 48', 20, 100); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+  await page.setInputFiles('#billphoto', { name: 'bill.png', mimeType: 'image/png', buffer: png });
+  await page.waitForSelector('form[data-form=save-bill]');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Sugar');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-03-01');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name1]'), 'Banana');
+  await page.click('button[data-act=bill-cancel]');
+  const prep = await page.evaluate(async (b64) => {
+    const { prepareImage } = await import('./ocr.js');
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const out = await prepareImage(new File([bytes], 'bill.png', { type: 'image/png' }), 150);   // shrink to 150px
+    const bmp = await createImageBitmap(out); return { type: out.type, w: bmp.width, h: bmp.height };
+  }, png.toString('base64'));
+  assert.deepEqual(prep, { type: 'image/png', w: 150, h: 100 });       // photo is scaled down, same shape
+  step('photo scan: text lands in the box and the review screen opens');
+
+  // ---------------------------------------------------------------- kitchen: meals
+  await tab('home'); await send('dinner outside pizza');
+  assert.match(await text(), /Logged dinner \(outside\): Pizza/);
+  await page.goto(base + 'index.html#kitchen/meals');
+  const meal = async (m, place, dish, date) => { await page.selectOption('form[data-form=meal] select[name=meal]', m); await page.selectOption('form[data-form=meal] select[name=place]', place);
+    await page.fill('form[data-form=meal] input[name=dish]', dish); await page.fill('form[data-form=meal] input[name=date]', date); await page.click('form[data-form=meal] button'); await page.waitForTimeout(80); };
+  await meal('Lunch', 'Ordered', 'Burger', dayOffset(0)); await meal('Snacks', 'Outside', 'Samosa and chips', dayOffset(0)); await meal('Lunch', 'Outside', 'Pizza', dayOffset(-1));
+  const meals = await text();
+  assert.match(meals, /outside or ordered in/);                          // 4 of the last meals not at home
+  assert.match(meals, /heavier or fried side/);                          // 3+ heavy meals in a row
+  assert.match(meals, /Pizza/); assert.match(meals, /Ideas for/);
+  await shot('meals');
+  await page.fill('form[data-form=food-settings] input[name=outsideMax]', '10'); await page.selectOption('form[data-form=food-settings] select[name=diet]', 'veg');
+  await page.click('form[data-form=food-settings] button'); await page.waitForTimeout(80);
+  assert.doesNotMatch(await text(), /outside or ordered in/);
+  await tab('home'); assert.match(await text(), /Kitchen/);
+  step('meals: log, alerts for outside food and a heavy streak, settings, Home card');
 
   assert.deepEqual(errors, [], 'browser errors: ' + errors.join('\n'));
   await browser.close(); server.close(); console.log('UI TESTS PASSED');
