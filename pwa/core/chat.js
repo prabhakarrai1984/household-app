@@ -6,6 +6,9 @@ import { matchMember } from './store.js';
 
 const MAX_EXPORT_BYTES = 20 * 1024 * 1024;
 const HEADER = /^\[?(?<a>\d{1,2})[/.\-](?<b>\d{1,2})[/.\-](?<year>\d{2,4}),?\s+(?<hour>\d{1,2})[:.](?<minute>\d{2})(?::(?<second>\d{2}))?\s*(?<ampm>[ap]\.?m\.?)?\]?\s*(?:-\s*)?(?<rest>.*)$/i;
+// Messages copied from the chat on Android look different: "[10:12 am, 11/11/2026] Name: text" (time first).
+const HEADER_TIME_FIRST = /^\[?(?<hour>\d{1,2})[:.](?<minute>\d{2})(?::(?<second>\d{2}))?\s*(?<ampm>[ap]\.?m\.?)?,\s*(?<a>\d{1,2})[/.\-](?<b>\d{1,2})[/.\-](?<year>\d{2,4})\]?\s*(?:-\s*)?(?<rest>.*)$/i;
+const headerMatch = (line) => HEADER.exec(line) || HEADER_TIME_FIRST.exec(line);
 const SKIPPED = /^(?:<?media omitted>?|<?(?:image|video|audio|sticker|gif|document) omitted>?|this message was deleted\.?|you deleted this message\.?|null)$/i;
 const CURRENCY = /₹|\brs\.?\s*\d|\binr\b/i;
 const SPENDING_VERB = /\b(?:spent|paid|bought)\b/i;
@@ -57,7 +60,7 @@ const normalize = (line) => line.replace(/[  ]/g, ' ').replace(/[‎‏﻿]/g
 
 function detectDayFirst(lines) {
   for (const line of lines) {
-    const m = HEADER.exec(line);
+    const m = headerMatch(line);
     if (m) {
       if (Number(m.groups.a) > 12) return true;
       if (Number(m.groups.b) > 12) return false;
@@ -84,7 +87,7 @@ export function parseChat(text) {
   const messages = [];
   let current = null;
   for (const line of lines) {
-    const h = HEADER.exec(line);
+    const h = headerMatch(line);
     const when = h ? buildWhen(h.groups, dayFirst) : null;
     if (when) {
       if (current) messages.push(current);

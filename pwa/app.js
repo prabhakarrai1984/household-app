@@ -182,13 +182,21 @@ screens.more = () => `<div class="card">
 screens.import = () => {
   const st = ui.staged;
   const intro = `<div class="card"><h2>Import a WhatsApp chat</h2>
-    <p class="muted">In WhatsApp open the group → ⋮ → More → Export chat → Without media, then choose this app. Or pick the exported file here.</p>
-    <input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></div>`;
+    <p><b>Easiest, no file hunting:</b> in WhatsApp open the group → ⋮ → More → Export chat → <i>Without media</i> → pick <b>Household</b> in the list.
+    <span class="muted">(Works once the app is installed from Chrome.)</span></p>
+    <p class="muted"><b>Saved it to Drive?</b> Open Drive, tap ⋮ on the file → <i>Send a copy</i> → <b>Household</b>.<br>
+    <b>Saved it to the phone?</b> Use the button below. The file is called <b>“WhatsApp Chat with …”</b>; look under <b>Recent</b> or <b>Downloads</b>
+    (Samsung: My Files → Downloads), or choose <b>Drive</b> from the picker's menu.</p>
+    <input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></div>
+  <div class="card"><h2>Or paste messages</h2>
+    <p class="muted">In the WhatsApp chat press and hold a message, tick the others you want, tap copy, then paste here. Good for a few recent messages.</p>
+    <form data-form="paste-import"><textarea name="text" placeholder="[10:12 am, 11/11/2026] Asha: Spent 450 on vegetables" rows="4" required></textarea><button>Read pasted messages</button></form></div>`;
   if (!st) return intro;
   const { rows, summary } = st;
   const s = summary;
   const ign = Object.entries(s.ignoredSenders);
   return `${intro}<div class="card"><h2>Review</h2>
+    <p class="muted">From: <b>${esc(ui.stagedName || 'chat file')}</b></p>
     <p class="muted">${s.messagesRead} messages read · ${s.candidates} look like entries${s.undone ? ` · ${s.undone} undone` : ''}${s.edited ? ` · ${s.edited} edited` : ''}${s.alreadyImported ? ` · ${s.alreadyImported} already imported` : ''}</p>
     ${ign.length ? `<p class="muted">Ignored (not on the Family list): ${ign.map(([n, c]) => `${esc(n)} (${c})`).join(', ')}</p>` : ''}
     <form data-form="confirm-import">${rows.length ? rows.map((r, i) => `<div class="review"><input type="checkbox" name="pick" value="${i}" ${r.likely && !r.maybeDuplicate ? 'checked' : ''}>
@@ -290,6 +298,11 @@ document.addEventListener('submit', (ev) => {
         const { saved, duplicates } = confirmImport(state, ui.staged.rows, picks, overrides, store.pushEntry);
         ui.staged = null; persist(); toast(`Saved ${saved} entr${saved === 1 ? 'y' : 'ies'}${duplicates ? ` (${duplicates} duplicates skipped)` : ''}.`); location.hash = '#home'; break;
       }
+      case 'paste-import': {
+        const staged = stageImport(state, f.text || '');
+        if (!staged.summary.messagesRead) return toast("I couldn't find WhatsApp messages in that text. Copy them from the chat (press and hold, select, copy) so the date, time and name come along.");
+        ui.staged = staged; ui.stagedName = 'pasted messages'; refresh(); break;
+      }
       case 'member': store.addMember(state, f); persist(); refresh(); break;
       case 'category': store.updateCategory(state, form.dataset.name, { name: f.name, keywords: f.keywords }); persist(); toast('Saved'); refresh(); break;
       case 'add-category': store.addCategory(state, f.name, f.keywords); persist(); toast('Added'); refresh(); break;
@@ -340,16 +353,17 @@ document.addEventListener('input', (ev) => {
   if (ev.target.id === 'search') { ui.search = ev.target.value; ui.limit = 60; $('#entryList').innerHTML = entryListHtml(); }
 });
 
-async function stageFromBuffer(buffer) {
+async function stageFromBuffer(buffer, name = '') {
   try {
     ui.staged = stageImport(state, await readExport(buffer));
+    ui.stagedName = name;
     if (location.hash !== '#import') location.hash = '#import'; else refresh();
   } catch (e) { fail(e); }
 }
 document.addEventListener('change', async (ev) => {
   const t = ev.target;
   if (t.dataset?.act === 'toggle-share') { state.settings.shareAfterSave = t.checked; persist(); }
-  if (t.id === 'chatfile' && t.files[0]) await stageFromBuffer(await t.files[0].arrayBuffer());
+  if (t.id === 'chatfile' && t.files[0]) await stageFromBuffer(await t.files[0].arrayBuffer(), t.files[0].name);
   if (t.id === 'restorefile' && t.files[0]) {
     try {
       const data = JSON.parse(await t.files[0].text());
@@ -375,7 +389,9 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); ui.i
     try {
       const cache = await caches.open('household-shared');
       const res = await cache.match('shared-chat');
-      if (res) { const buf = await res.arrayBuffer(); await cache.delete('shared-chat'); history.replaceState(null, '', location.pathname); await stageFromBuffer(buf); }
+      if (res) { const buf = await res.arrayBuffer(); await cache.delete('shared-chat'); history.replaceState(null, '', location.pathname);
+        let name = ''; try { name = decodeURIComponent(res.headers.get('x-filename') || ''); } catch { /* ignore */ }
+        await stageFromBuffer(buf, name); }
     } catch (e) { fail(e); }
   }
 })();

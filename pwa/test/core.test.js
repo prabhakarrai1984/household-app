@@ -331,3 +331,17 @@ test('chat: a row matching something you typed yourself is flagged as a possible
   const { rows } = stageImport(s, '10/11/26, 9:00 am - Asha: Spent 450 on vegetables\n10/11/26, 9:05 am - Asha: Spent 99 on milk');
   assert.deepEqual(rows.map((r) => r.maybeDuplicate), [true, false]);
 });
+
+test('chat: messages copied from WhatsApp (time first, 4-digit year) and pasted', () => {
+  const pasted = '[10:12 am, 11/11/2026] Asha: Spent 450 on vegetables\n[1:05 pm, 11/11/2026] Rahul: petrol 2000\n[1:06 pm, 11/11/2026] Rahul: undo';
+  const m = parseChat(pasted);
+  assert.equal(m.length, 3);
+  assert.deepEqual([m[0].sender, m[0].date, m[0].minuteKey], ['Asha', '2026-11-11', '2026-11-11 10:12']);
+  assert.equal(m[1].minuteKey, '2026-11-11 13:05');
+  const { rows } = stageImport(fresh(), pasted);
+  assert.deepEqual(rows.map((r) => [r.addedBy, r.amount]), [['Asha', 450]]);
+  // the same message later arrives in a full export: it is recognised, not doubled
+  const s = fresh();
+  confirmImport(s, rows, new Set([0]), {}, store.pushEntry);
+  assert.equal(stageImport(s, '11/11/26, 10:12 am - Asha: Spent 450 on vegetables').rows.length, 0);
+});

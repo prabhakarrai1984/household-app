@@ -25,9 +25,14 @@ Send the same address to family members who want the app too.
 
 1. **Home** asks for your name. Type it exactly as it shows in your WhatsApp group (for example `Prabhakar Rai`).
 2. **More → Family**: add the people whose messages count. (Skip it and everyone in an imported chat counts.)
-3. **More → Import WhatsApp chat**: in WhatsApp open the group → ⋮ → More → Export chat → *Without media*.
-   On Android, when the app is installed, you can choose **Household** straight from the share list.
-   Otherwise pick the file with the button. Review, untick anything that isn't an expense, save.
+3. **More → Import WhatsApp chat**. Three ways, easiest first:
+   - **Share straight from WhatsApp** (no file hunting): group → ⋮ → More → Export chat → *Without media* → pick **Household**.
+     Needs the app installed from Chrome.
+   - **Saved to Drive:** open Drive, ⋮ on the file → *Send a copy* → **Household**.
+   - **Saved to the phone:** use the file button. The file is called *WhatsApp Chat with …*; look under *Recent* or *Downloads*
+     (Samsung: My Files → Downloads), or pick *Drive* in the picker's menu. The picker only lists `.txt` and `.zip` files.
+   - **Paste messages:** in the chat press and hold a message, select more, tap copy, paste into the box on the Import screen.
+   The review screen shows which file or text it came from. Untick anything that isn't an expense, then save.
 4. Post new expenses in the group as usual. When you add one in the app, tap **Share to group chat** so the
    group stays the shared record. If you import later, entries that match one you typed yourself are
    flagged *may be a duplicate* and left unticked.

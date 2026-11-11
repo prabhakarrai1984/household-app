@@ -63,6 +63,7 @@ const server = http.createServer((req, res) => {
   await page.setInputFiles('#chatfile', path.join(ROOT, '..', 'samples', 'family_chat_hinglish.txt'));
   await page.waitForSelector('form[data-form=confirm-import]');
   const review = await text();
+  assert.match(review, /From: family_chat_hinglish\.txt/); assert.match(await page.locator('input#chatfile').getAttribute('accept'), /\.txt,\.zip/);
   assert.match(review, /Dhaniya and mirchi/); assert.match(review, /1 undone|undone/); assert.match(review, /edited/);
   await shot('import-review');
   await page.click('form[data-form=confirm-import] button');
@@ -72,6 +73,17 @@ const server = http.createServer((req, res) => {
   await page.goto(base + 'index.html#import');
   await page.setInputFiles('#chatfile', path.join(ROOT, '..', 'samples', 'family_chat_hinglish.txt'));
   await page.waitForSelector('text=Nothing new to import'); step('re-import adds nothing');
+
+  // paste messages copied from WhatsApp (Android copies time first)
+  await page.goto(base + 'index.html#import');
+  await page.fill('form[data-form=paste-import] textarea', 'hello there');
+  await page.click('form[data-form=paste-import] button');
+  assert.match(await page.locator('#toast').innerText(), /couldn't find WhatsApp messages/);
+  await page.fill('form[data-form=paste-import] textarea', '[10:12 am, 11/11/2026] Asha: Spent 333 on bread\n[10:13 am, 11/11/2026] Rahul: tea 20');
+  await page.click('form[data-form=paste-import] button');
+  await page.waitForSelector('form[data-form=confirm-import]');
+  assert.match(await text(), /From: pasted messages/); assert.match(await text(), /₹333\.00/);
+  step('paste messages copied from WhatsApp');
 
   // recurring
   await page.goto(base + 'index.html#recurring');
