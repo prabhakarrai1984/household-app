@@ -1,10 +1,10 @@
 // Offline support. When the phone is online the app always asks the server for the newest files (so an update shows up
 // on the next open), and falls back to the saved copy when offline or when the network is very slow.
 // No user data ever passes through here, except that a chat file shared TO the app is parked briefly so the app can read it.
-const CACHE = 'household-shell-v3';   // change this name to throw away every old saved copy
+const CACHE = 'household-shell-v4';   // change this name to throw away every old saved copy
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './core/dates.js', './core/format.js', './core/parser.js', './core/store.js', './core/recurring.js',
-  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js'];
+  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js', './pdfbill.js'];
 
 self.addEventListener('install', (e) => {
   // one missing file must not stop the app from installing, so add them individually

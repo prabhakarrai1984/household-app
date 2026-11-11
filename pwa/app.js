@@ -11,8 +11,9 @@ import { ENTRY_HEADER, entriesWorkbook, entryRow } from './core/xlsx.js';
 import * as grocery from './core/grocery.js';
 import * as food from './core/food.js';
 import { scanBill } from './ocr.js';
+import { readPdf } from './pdfbill.js';
 
-export const VERSION = '2026-11-11 · Kitchen (grocery + meals)';
+export const VERSION = '2026-11-11 · Kitchen + PDF bills';
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
 const ui = { bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
@@ -263,9 +264,10 @@ const STATUS_TAG = { fast: '<span class="tag warn">used faster than usual</span>
 function billCard() {
   const b = ui.bill;
   const intro = `<div class="card"><h2>Add a grocery bill</h2>
-    <p class="muted">Paste the bill text (BigBasket, Blinkit, DMart and similar emails or messages), type it, or scan a photo. One item per line, like <i>Atta 5kg 250</i>.</p>
+    <p class="muted">Paste the bill text (BigBasket, Blinkit, DMart and similar emails or messages), type it, scan a photo, or upload the PDF / screenshot from an online order. One item per line, like <i>Atta 5kg 250</i>.</p>
     <form data-form="read-bill"><textarea name="text" id="billtext" rows="5" placeholder="Atta 5kg 250&#10;Milk 500ml 2 28 56&#10;Onion 2 kg 60">${esc(ui.billText)}</textarea>
-    <div class="row"><button>Read bill</button><label class="btn secondary" style="margin:0">📷 Scan photo<input type="file" id="billphoto" accept="image/*" capture="environment" hidden></label></div></form>
+    <div class="row"><button>Read bill</button><label class="btn secondary" style="margin:0">📷 Scan photo<input type="file" id="billphoto" accept="image/*" capture="environment" hidden></label>
+    <label class="btn secondary" style="margin:0">📄 Upload PDF / image<input type="file" id="billfile" accept="application/pdf,.pdf,image/*" hidden></label></div></form>
     <p class="muted" id="ocrStatus">${esc(ui.ocr)}</p></div>`;
   if (!b) return intro;
   const total = b.lines.reduce((t, l) => t + (Number(l.price) || 0), 0);
@@ -520,15 +522,16 @@ async function stageFromBuffer(buffer, name = '') {
 document.addEventListener('change', async (ev) => {
   const t = ev.target;
   if (t.dataset?.act === 'people') { const n = Math.round(Number(t.value)); if (n >= 1 && n <= 20) { state.settings.people = n; persist(); refresh(); } }
-  if (t.id === 'billphoto' && t.files[0]) {
+  if ((t.id === 'billphoto' || t.id === 'billfile') && t.files[0]) {
     const status = (text) => { ui.ocr = text; const el = $('#ocrStatus'); if (el) el.textContent = text; };
     try {
-      const text = await scanBill(t.files[0], status);
-      if (!text.trim()) { status('No text found in that photo. Try a clearer, well-lit picture, or type the bill.'); }
+      const f = t.files[0], isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+      const text = isPdf ? await readPdf(f, status) : await scanBill(f, status);
+      if (!text.trim()) { status('No text found in that file. Try a clearer, well-lit picture, or type the bill.'); }
       else {
         const box = $('#billtext'); if (box) box.value = text; ui.billText = text;
         const parsed = grocery.parseBill(text, { today: today() });
-        status(parsed.lines.length ? 'Done. Please check every line below.' : "I read the photo but couldn't find items. Edit the text above and tap Read bill.");
+        status(parsed.lines.length ? 'Done. Please check every line below.' : "I read the file but couldn't find items. Edit the text above and tap Read bill.");
         if (parsed.lines.length) { ui.bill = { date: parsed.date, store: '', lines: parsed.lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, price: l.price })), skipped: parsed.skipped.length }; refresh(); }
       }
     } catch (e) { status(e.message || String(e)); }

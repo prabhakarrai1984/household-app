@@ -25,6 +25,11 @@ const server = http.createServer((req, res) => {
   await context.addInitScript(() => {   // stand-in for the downloaded text reader: tests the wiring, not the OCR itself
     window.Tesseract = { createWorker: async () => ({ recognize: async () => ({ data: { text: 'BIG MART\nDate 01/03/2026\nSugar 1kg 48\nBanana 1 dozen 60\nTotal 108' } }), terminate: async () => {} }) };
   });
+  await context.addInitScript(() => {   // stand-in for the downloaded PDF reader
+    const item = (str, x, y) => ({ str, transform: [1, 0, 0, 1, x, y] });
+    window.pdfjsLib = { GlobalWorkerOptions: {}, getDocument: () => ({ promise: Promise.resolve({ numPages: 1, getPage: async () => ({ getTextContent: async () => ({ items: [
+      item('Total', 10, 500), item('Date 02/03/2026', 10, 700), item('Atta 5kg', 10, 650), item('250', 200, 650), item('Milk 500ml', 10, 600), item('56', 200, 600), item('Ghee 1 L', 10, 550), item('620', 200, 550)] }) }) }) }) };
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -196,6 +201,13 @@ const server = http.createServer((req, res) => {
   assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-03-01');
   assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name1]'), 'Banana');
   await page.click('button[data-act=bill-cancel]');
+  await page.setInputFiles('#billfile', { name: 'order.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 stub') });
+  await page.waitForSelector('form[data-form=save-bill]');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Atta');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-03-02');
+  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name2]'), 'Ghee');
+  await page.click('button[data-act=bill-cancel]');
+  const { itemsToText } = await page.evaluate(() => import('./pdfbill.js').then((m) => ({ itemsToText: m.itemsToText.toString() })));
   const prep = await page.evaluate(async (b64) => {
     const { prepareImage } = await import('./ocr.js');
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));

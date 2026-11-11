@@ -69,6 +69,8 @@ any language, for example Hindi words.
   vegetarian + eggs, or anything. Thresholds and your own lighter/heavier food words are editable.
 - These are simple word-based rules for everyday awareness, **not medical or dietary advice**.
 
+**PDF bills:** Kitchen → Grocery → "Upload PDF / image" reads online-order invoices. PDFs with real text are read exactly (pdf.js, downloaded once like the photo reader); picture-only PDFs are read like a photo. Always check the lines before saving.
+
 **Photo scanning, honestly:** the bill-photo reader (Tesseract.js) is downloaded once from a public library host the first
 time you scan, then kept for offline use. The photo itself never leaves your phone. Reading crumpled receipts is
 imperfect, so always check the lines. I could not test the real reader on a bill photo here (no internet in my workspace),
