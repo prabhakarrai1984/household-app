@@ -312,6 +312,21 @@ export function analyze(state, today, people = 4) {
   return out.sort((a, b) => (rank[a.status] - rank[b.status]) || a.label.localeCompare(b.label));
 }
 
+/**
+ * How full the cupboard probably is for one analysed item -> {band, level 0..1 | null, daysLeft | null}.
+ * band: 'full' (just restocked), 'fine', 'low' (nearing restock), 'restock' (out or about to be), 'learning' (not enough history).
+ */
+export function stockLevel(a, today) {
+  if (a.remaining === 0 && a.daysLeft === 0) return { band: 'restock', level: 0, daysLeft: 0 };
+  let level = null;
+  if (a.perDay && a.lastQty != null && a.lastQty > 0 && a.remaining != null) level = a.remaining / a.lastQty;
+  else if (a.medianDays && a.daysLeft != null) level = a.daysLeft / a.medianDays;
+  if (level == null) return { band: 'learning', level: null, daysLeft: null, sinceBought: diffDays(today, a.lastBought) };
+  level = Math.max(0, Math.min(1, level));
+  const band = level <= 0.12 || (a.daysLeft != null && a.daysLeft < 1.5) ? 'restock' : level < 0.35 ? 'low' : level < 0.7 ? 'fine' : 'full';
+  return { band, level, daysLeft: a.daysLeft };
+}
+
 // ------------------------------------------------------------------ next month's list
 
 /**

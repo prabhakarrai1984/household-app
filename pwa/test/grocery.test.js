@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseBillLine, parseBill, findBillDate, itemKey, addBill, deleteBill, looksSaved, markFinished,
-  analyze, monthlyList, listShareText, toBase, fromBase, formatQty } from '../core/grocery.js';
+  analyze, stockLevel, monthlyList, listShareText, toBase, fromBase, formatQty } from '../core/grocery.js';
 import { newState } from '../core/store.js';
 
 const TODAY = '2026-11-10';
@@ -169,4 +169,18 @@ test('DMart-style tax invoice: reads only the item table, keeps household items 
   const twice = text.replace('TOTAL ITEMS: 3', 'TOTAL ITEMS: 3') + '\n' + [
     '1.  10063020  2  Daawat Premium Rice 5Kgs   2.0   545.0   1090.0', '2.  08023200  2  Bazana Walnut Kernels 250g   2.0   352.0   704.0', '3.  33061020  2  Colgate Strawberry Flavor Tp-40G   1.0   93.0   93.0'].join('\n');
   assert.equal(parseBill(twice, { today: '2026-11-11' }).lines.length, 3);
+});
+
+test('stock level: just bought is full, mid-way is fine, nearly out is low, out is restock, one purchase is learning', () => {
+  const st = newState();
+  for (const d of ['2026-01-01', '2026-01-11', '2026-01-21']) addBill(st, { date: d, lines: [{ name: 'Atta', qty: 5, unit: 'kg', price: 250 }] });   // 5 kg per 10 days = 0.5 kg/day
+  const at = (day) => { const a = analyze(st, day).find((x) => x.key === itemKey('Atta')); return stockLevel(a, day); };
+  assert.equal(at('2026-01-21').band, 'full');
+  assert.equal(at('2026-01-26').band, 'fine');                 // half left
+  assert.equal(at('2026-01-29').band, 'low');                  // ~1 kg left
+  assert.equal(at('2026-01-31').band, 'restock');              // about to run out
+  const once = newState(); addBill(once, { date: '2026-01-01', lines: [{ name: 'Sugar', qty: 1, unit: 'kg', price: 48 }] });
+  assert.equal(stockLevel(analyze(once, '2026-01-05')[0], '2026-01-05').band, 'learning');
+  markFinished(st, itemKey('Atta'), '2026-01-24');
+  assert.equal(at('2026-01-25').band, 'restock');
 });

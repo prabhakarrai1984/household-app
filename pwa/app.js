@@ -13,7 +13,7 @@ import * as food from './core/food.js';
 import { scanBill } from './ocr.js';
 import { readPdf } from './pdfbill.js';
 
-export const VERSION = 'Build 4 · 2026-11-11 · DMart invoices read, all items kept';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept. Add 1 on every change.
+export const VERSION = 'Build 6 · 2026-11-12 · stock board + roomy bill review';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept, 5 update button, 6 stock board and roomy bill lines. Add 1 on every change.
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
 const ui = { bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
@@ -191,7 +191,8 @@ screens.more = () => `<div class="card">
   <div class="card"><h2>Your name</h2><form data-form="set-me" class="row"><input name="me" value="${esc(state.settings.me)}" placeholder="As shown in WhatsApp" required><button>Save</button></form>
   <label class="row" style="margin-top:12px"><input type="checkbox" data-act="toggle-share" ${state.settings.shareAfterSave ? 'checked' : ''}> <span>Offer "Share to group chat" after saving</span></label></div>
   ${ui.install ? '<div class="card"><button data-act="install">Install on this phone</button></div>' : ''}
-  <div class="card"><h2>About</h2><p class="muted">Version ${esc(VERSION)}<br>Your data is stored only on this phone. The WhatsApp group chat is the shared record: post expenses there, and anyone who wants the full picture imports the exported chat here.</p></div>`;
+  <div class="card"><h2>About</h2><p class="muted">Version ${esc(VERSION)}<br>Your data is stored only on this phone. The WhatsApp group chat is the shared record: post expenses there, and anyone who wants the full picture imports the exported chat here.</p>
+    <button class="secondary" data-act="refresh-app">🔄 Update app now</button><p class="muted">Throws away the app's saved copy of itself and loads the newest version. Your entries are not touched.</p></div>`;
 
 screens.import = () => {
   const st = ui.staged;
@@ -275,12 +276,11 @@ function billCard() {
     <p class="muted">Fix anything that was read wrongly. ${b.skipped ? `${b.skipped} other lines (totals, tax, headings) were skipped.` : ''} Photo scans especially need a look.</p>
     <form data-form="save-bill"><div class="grid2"><label>Bill date<input type="date" name="date" value="${esc(b.date)}" required></label>
     <label>Shop (optional)<input name="store" value="${esc(b.store || '')}" placeholder="e.g. DMart"></label></div>
-    <div class="billhead"><span>Item</span><span>Qty</span><span>Unit</span><span>₹ Price</span><span></span></div>
-    ${b.lines.map((l, i) => `<div class="billrow"><input name="name${i}" value="${esc(l.name)}" placeholder="Item">
-      <input name="qty${i}" inputmode="decimal" value="${l.qty ?? ''}" placeholder="–">
-      <select name="unit${i}"><option value=""></option>${options(grocery.DISPLAY_UNITS, l.unit || '')}</select>
-      <input name="price${i}" inputmode="decimal" value="${l.price ?? ''}" placeholder="–">
-      <button type="button" class="small secondary" data-act="bill-del-line" data-i="${i}" aria-label="Remove line">✕</button></div>`).join('')}
+    ${b.lines.map((l, i) => `<div class="billrow"><textarea name="name${i}" rows="2" placeholder="Item name">${esc(l.name)}</textarea>
+      <div class="billnums"><label>Qty<input name="qty${i}" inputmode="decimal" value="${l.qty ?? ''}" placeholder="–"></label>
+      <label>Unit<select name="unit${i}"><option value=""></option>${options(grocery.DISPLAY_UNITS, l.unit || '')}</select></label>
+      <label>₹ Price<input name="price${i}" inputmode="decimal" value="${l.price ?? ''}" placeholder="–"></label>
+      <button type="button" class="small secondary" data-act="bill-del-line" data-i="${i}" aria-label="Remove line">✕</button></div></div>`).join('')}
     <div class="row"><button type="button" class="small secondary" data-act="bill-add-line">+ Add a line</button><span class="muted">Lines total ${inr(total)}</span></div>
     <label class="row"><input type="checkbox" name="record"> <span>Also record ${inr(total)} as a Grocery expense <span class="muted">(skip if you already posted it)</span></span></label>
     <div class="row"><button>Save bill</button><button type="button" class="secondary" data-act="bill-cancel">Cancel</button></div></form></div>`;
@@ -299,15 +299,38 @@ function listCard() {
     ${list.items.length ? '<button class="small" data-act="share-list">Share list</button>' : ''}</div>`;
 }
 
-function itemsCard() {
-  const a = grocery.analyze(state, today(), state.settings.people || 4);
-  if (!a.length) return '';
-  return `<div class="card"><h2>Your items</h2>${a.map((x) => `<details><summary><span><b>${esc(x.label)}</b> <span class="muted">· bought ${x.buys}×, last ${niceDate(x.lastBought)}</span></span>${STATUS_TAG[x.status]}</summary>
+const BANDS = [
+  ['restock', '🔴', 'Restock now', 'Finished or about to run out'],
+  ['low', '🟠', 'Running low', 'Nearing restock time'],
+  ['fine', '🟡', 'Good for now', 'Some time left'],
+  ['full', '🟢', 'Well stocked', 'Restocked recently'],
+  ['learning', '⚪', 'Still learning', 'Buy it once more and I can tell'],
+];
+function pantryRow(x, st) {
+  const days = st.daysLeft != null ? Math.round(st.daysLeft) : null;
+  const when = st.band === 'learning' ? `bought ${st.sinceBought === 0 ? 'today' : st.sinceBought + ' days ago'}`
+    : st.band === 'restock' ? 'restock now' : days <= 0 ? 'almost out' : `about ${days} day${days === 1 ? '' : 's'} left`;
+  const cap = { restock: 12, low: 34 }[st.band] ?? 100;   // the bar never contradicts the colour
+  const pct = st.level == null ? 0 : Math.max(6, Math.min(cap, Math.round(st.level * 100)));
+  return `<details class="pitem ${st.band}"><summary><span class="pname"><b>${esc(x.label)}</b><span class="muted">last bought ${niceDate(x.lastBought)}${x.lastQty != null ? ' · ' + esc(grocery.formatQty(x.lastQty, x.unit)) : ''}</span></span>
+    <span class="pwhen">${esc(when)}</span><span class="pbar"><i style="width:${pct}%"></i></span></summary>
     <p class="muted" style="margin:8px 0 4px">${esc(x.message)}</p>
     ${x.note ? `<p class="muted" style="margin:4px 0">${esc(x.note)}</p>` : ''}
-    ${x.daysLeft != null ? `<p class="muted" style="margin:4px 0">${x.remaining === 0 ? 'Probably finished.' : `Probably enough for about ${Math.round(x.daysLeft)} more day${Math.round(x.daysLeft) === 1 ? '' : 's'}.`}</p>` : ''}
-    ${x.intervals.length ? `<p class="muted" style="margin:4px 0">${x.intervals.slice(-4).map((i) => `${i.days} days${i.qty != null ? ` (${esc(grocery.formatQty(i.qty, i.unit))})` : ''}${i.finished ? ' ✓' : ''}`).join(' · ')}</p>` : ''}
-    <button class="small secondary" data-act="finish-item" data-key="${esc(x.key)}">It ran out today</button></details>`).join('')}</div>`;
+    ${x.intervals.length ? `<p class="muted" style="margin:4px 0">Past gaps: ${x.intervals.slice(-4).map((i) => `${i.days} days${i.qty != null ? ` (${esc(grocery.formatQty(i.qty, i.unit))})` : ''}${i.finished ? ' ✓' : ''}`).join(' · ')}</p>` : ''}
+    <button class="small secondary" data-act="finish-item" data-key="${esc(x.key)}">It ran out today</button></details>`;
+}
+function itemsCard() {
+  const t = today(), all = grocery.analyze(state, t, state.settings.people || 4);
+  if (!all.length) return '';
+  const rows = all.map((x) => ({ x, st: grocery.stockLevel(x, t) }));
+  const groups = BANDS.map(([band, icon, title, hint]) => {
+    const list = rows.filter((r) => r.st.band === band).sort((p, q) => (p.st.level ?? 9) - (q.st.level ?? 9) || p.x.label.localeCompare(q.x.label));
+    if (!list.length) return '';
+    return `<div class="pgroup ${band}"><h3>${icon} ${title} <span class="count">${list.length}</span><span class="muted"> · ${hint}</span></h3>${list.map((r) => pantryRow(r.x, r.st)).join('')}</div>`;
+  }).join('');
+  const need = rows.filter((r) => r.st.band === 'restock' || r.st.band === 'low').length;
+  return `<div class="card"><h2>Your kitchen stock</h2>
+    <p class="pnote">${need ? `<b>${need}</b> item${need === 1 ? '' : 's'} need${need === 1 ? 's' : ''} restocking soon.` : 'Nothing needs restocking right now. 🎉'} <span class="muted">Tap an item for details.</span></p>${groups}</div>`;
 }
 
 function billsCard() {
@@ -352,7 +375,7 @@ function mealsView() {
 }
 const addDaysLocal = (d, n) => { const [y, m, dd] = d.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1, dd + n)); return t.toISOString().slice(0, 10); };
 
-screens.kitchen = (sub) => kitchenTabs(sub) + (sub === 'meals' ? mealsView() : `${billCard()}${listCard()}${itemsCard()}${billsCard()}`);
+screens.kitchen = (sub) => kitchenTabs(sub) + (sub === 'meals' ? mealsView() : `${itemsCard()}${billCard()}${listCard()}${billsCard()}`);
 
 // ------------------------------------------------------------------ routing
 
@@ -498,6 +521,11 @@ document.addEventListener('click', async (ev) => {
       case 'bill-add-line': syncBill(document.querySelector('form[data-form=save-bill]')); ui.bill.lines.push({ name: '', qty: null, unit: '', price: null }); refresh(); break;
       case 'bill-del-line': syncBill(document.querySelector('form[data-form=save-bill]')); ui.bill.lines.splice(Number(el.dataset.i), 1); refresh(); break;
       case 'bill-cancel': ui.bill = null; refresh(); break;
+      case 'refresh-app': {   // clears the saved copy of the app (never the data) and reloads
+        for (const r of await navigator.serviceWorker?.getRegistrations?.() || []) await r.unregister();
+        for (const k of await caches.keys()) if (k !== 'household-shared') await caches.delete(k);
+        location.replace(location.pathname + '?v=' + Date.now()); break;
+      }
       case 'finish-item': grocery.markFinished(state, el.dataset.key, today()); persist(); toast('Noted. Next time I will count the days exactly.'); refresh(); break;
       case 'delete-bill': if (confirm('Delete this bill and its items?')) { grocery.deleteBill(state, id); persist(); refresh(); } break;
       case 'delete-meal': food.deleteMeal(state, id); persist(); refresh(); break;

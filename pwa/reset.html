@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Update Household App</title>
+<body style="font-family:system-ui;padding:24px;max-width:480px;margin:auto"><h2>Updating…</h2><p id="m">Clearing the saved copy of the app. Your entries are not touched.</p>
+<script>
+(async () => {
+  try {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for (const k of await caches.keys()) await caches.delete(k);
+    document.getElementById('m').textContent = 'Done. Opening the app…';
+  } catch (e) { document.getElementById('m').textContent = 'Could not clear: ' + e.message; }
+  setTimeout(() => location.replace('./?v=' + Date.now()), 700);
+})();
+</script>

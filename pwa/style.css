@@ -1,8 +1,10 @@
 :root {
+  --s-full: #16a34a; --s-fine: #a3b81d; --s-low: #f59e0b; --s-restock: #dc2626; --s-learning: #98a2b3;
   --bg: #f6f7f9; --card: #ffffff; --text: #1f2933; --muted: #667085; --line: #e4e7ec;
   --accent: #0f766e; --ok: #067647; --okbg: #ecfdf3; --err: #b42318; --errbg: #fef3f2;
 }
 @media (prefers-color-scheme: dark) {
+  :root { --s-full: #4ade80; --s-fine: #d9e56a; --s-low: #fdba4d; --s-restock: #ff7b72; --s-learning: #8b95a3; }
   :root { --bg: #12161b; --card: #1b2128; --text: #e8ecf0; --muted: #98a2b3; --line: #2b333c;
           --accent: #2dd4bf; --ok: #75e0a7; --okbg: #10291d; --err: #fda29b; --errbg: #3b1a18; }
 }
@@ -59,7 +61,25 @@ nav#tabs a { font-size: 0.66rem; padding-left: 0; padding-right: 0; }
 .seg a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 details { border-bottom: 1px solid var(--line); padding: 8px 0; } details:last-child { border-bottom: 0; }
 summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-.billrow { display: grid; grid-template-columns: 1fr 64px 64px 72px 34px; gap: 6px; margin-bottom: 8px; align-items: center; }
-.billrow input, .billrow select { padding: 8px 6px; width: 100%; }
-.billhead { display: grid; grid-template-columns: 1fr 64px 64px 72px 34px; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+/* one item = its own block: the full name on top (wraps onto two lines), then qty / unit / price underneath */
+.billrow { background: var(--card-alt, rgba(127,127,127,.08)); border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+.billrow textarea { width: 100%; min-height: 0; padding: 8px; resize: vertical; font: inherit; margin-bottom: 6px; }
+.billnums { display: grid; grid-template-columns: 1fr 1fr 1.2fr 40px; gap: 6px; align-items: end; }
+.billnums label { font-size: 0.72rem; color: var(--muted); margin: 0; }
+.billnums input, .billnums select { padding: 8px 6px; width: 100%; margin-top: 2px; }
 .alert { border-left: 4px solid var(--err); } .alert.info { border-left-color: var(--accent); }
+
+/* kitchen stock board: colour = how full the cupboard probably is */
+.pnote { margin: 0 0 12px; font-size: 1rem; }
+.pgroup { margin-bottom: 14px; }
+.pgroup h3 { font-size: 0.92rem; margin: 0 0 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.pgroup h3 .count { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 0.78rem; }
+.pgroup h3 .muted { font-weight: 400; font-size: 0.78rem; }
+.pitem { border-left: 5px solid var(--c); border-bottom: 0; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.pitem.full { --c: var(--s-full); } .pitem.fine { --c: var(--s-fine); } .pitem.low { --c: var(--s-low); }
+.pitem.restock { --c: var(--s-restock); } .pitem.learning { --c: var(--s-learning); }
+.pitem summary { list-style: none; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; } .pitem summary::-webkit-details-marker { display: none; }
+.pname { display: grid; min-width: 0; } .pname b { overflow-wrap: anywhere; font-weight: 600; } .pname .muted { font-size: 0.78rem; }
+.pwhen { white-space: nowrap; font-size: 0.8rem; font-weight: 600; color: var(--c); text-align: right; }
+.pbar { grid-column: 1 / -1; display: block; height: 8px; border-radius: 999px; background: var(--line); margin-top: 4px; overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--c); border-radius: 999px; }

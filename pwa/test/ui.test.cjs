@@ -58,7 +58,7 @@ const server = http.createServer((req, res) => {
 
   // custom category
   await tab('more'); await page.click('a[href="#categories"]');
-  await page.fill('form[data-form=add-category] input[name=name]', 'Pets');
+  await page.fill('form[data-form=add-category] [name=name]', 'Pets');
   await page.fill('form[data-form=add-category] textarea', 'dog food, vet');
   await page.click('form[data-form=add-category] button');
   assert.equal(await page.locator('form[data-form=category] input[value="Pets"]').count(), 1);
@@ -68,8 +68,8 @@ const server = http.createServer((req, res) => {
 
   // family + import
   await tab('more'); await page.click('a[href="#family"]');
-  await page.fill('form[data-form=member] input[name=name]', 'Asha'); await page.click('form[data-form=member] button');
-  await page.fill('form[data-form=member] input[name=name]', 'Rahul'); await page.click('form[data-form=member] button');
+  await page.fill('form[data-form=member] [name=name]', 'Asha'); await page.click('form[data-form=member] button');
+  await page.fill('form[data-form=member] [name=name]', 'Rahul'); await page.click('form[data-form=member] button');
   await page.goto(base + 'index.html#import');
   await page.setInputFiles('#chatfile', path.join(ROOT, '..', 'samples', 'family_chat_hinglish.txt'));
   await page.waitForSelector('form[data-form=confirm-import]');
@@ -99,7 +99,7 @@ const server = http.createServer((req, res) => {
   // recurring
   await page.goto(base + 'index.html#recurring');
   const day = String(new Date().getDate() + 1 > 28 ? 28 : new Date().getDate() + 1);
-  await page.fill('form[data-form=recurring] input[name=name]', 'Rent');
+  await page.fill('form[data-form=recurring] [name=name]', 'Rent');
   await page.fill('form[data-form=recurring] input[name=amount]', '25000');
   await page.fill('form[data-form=recurring] input[name=dueDay]', day);
   await page.click('form[data-form=recurring] button');
@@ -173,20 +173,21 @@ const server = http.createServer((req, res) => {
   };
   await page.fill('#billtext', 'BIG MART\nInvoice 55   Date 05/11/2026\n1. Aashirvaad Atta 5kg 250.00\n2. Amul Milk 500ml 2 28.00 56.00\nSub Total 306\nGST 0');
   await page.click('form[data-form=read-bill] button:not([type=button])'); await page.waitForSelector('form[data-form=save-bill]');
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Aashirvaad Atta');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name0]'), 'Aashirvaad Atta');
   assert.equal(await page.inputValue('form[data-form=save-bill] select[name=unit0]'), 'kg');
   assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-11-05');
   await page.click('button[data-act=bill-add-line]');                                      // edits survive adding a line
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Aashirvaad Atta');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name0]'), 'Aashirvaad Atta');
   await page.click('button[data-act=bill-del-line][data-i="2"]');
   await page.fill('form[data-form=save-bill] input[name=date]', dayOffset(-60));
   await page.click('form[data-form=save-bill] > .row:last-of-type button:first-child');
   await page.waitForSelector('form[data-form=read-bill]'); await page.waitForTimeout(80);
-  assert.match(await text(), /Your items/); assert.match(await text(), /Atta/);
+  assert.match(await text(), /Your kitchen stock/); assert.match(await text(), /Atta/);
   await saveBill('Atta 5kg 250\nMilk 500ml 28', dayOffset(-35));
   await saveBill('Atta 5kg 250\nMilk 500ml 28', dayOffset(-10));
   const kitchen = await text();
   assert.match(kitchen, /Next 30 days: what to buy/); assert.match(kitchen, /Atta/);
+  await shot('kitchen-stock');
   await page.click('details:has-text("Atta") summary'); assert.match(await text(), /Lasted 25 days/);
   await page.fill('input[data-act=people]', '2'); await page.dispatchEvent('input[data-act=people]', 'change');
   assert.match(await page.locator('input[data-act=people]').inputValue(), /2/);
@@ -197,15 +198,15 @@ const server = http.createServer((req, res) => {
     x.fillStyle = '#fff'; x.fillRect(0, 0, 300, 200); x.fillStyle = '#000'; x.font = '20px sans-serif'; x.fillText('Sugar 1kg 48', 20, 100); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
   await page.setInputFiles('#billphoto', { name: 'bill.png', mimeType: 'image/png', buffer: png });
   await page.waitForSelector('form[data-form=save-bill]');
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Sugar');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name0]'), 'Sugar');
   assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-03-01');
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name1]'), 'Banana');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name1]'), 'Banana');
   await page.click('button[data-act=bill-cancel]');
   await page.setInputFiles('#billfile', { name: 'order.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 stub') });
   await page.waitForSelector('form[data-form=save-bill]');
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name0]'), 'Atta');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name0]'), 'Atta');
   assert.equal(await page.inputValue('form[data-form=save-bill] input[name=date]'), '2026-03-02');
-  assert.equal(await page.inputValue('form[data-form=save-bill] input[name=name2]'), 'Ghee');
+  assert.equal(await page.inputValue('form[data-form=save-bill] [name=name2]'), 'Ghee');
   await page.click('button[data-act=bill-cancel]');
   const { itemsToText } = await page.evaluate(() => import('./pdfbill.js').then((m) => ({ itemsToText: m.itemsToText.toString() })));
   const prep = await page.evaluate(async (b64) => {
