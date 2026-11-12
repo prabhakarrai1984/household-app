@@ -4,7 +4,7 @@
 const CACHE = 'household-shell-v4';   // change this name to throw away every old saved copy
 const SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './core/dates.js', './core/format.js', './core/parser.js', './core/store.js', './core/recurring.js',
-  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js', './pdfbill.js'];
+  './core/reports.js', './core/service.js', './core/chat.js', './core/xlsx.js', './core/grocery.js', './core/food.js', './ocr.js', './pdfbill.js', './core/medicine.js'];
 
 self.addEventListener('install', (e) => {
   // one missing file must not stop the app from installing, so add them individually

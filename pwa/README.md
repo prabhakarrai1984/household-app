@@ -69,6 +69,8 @@ any language, for example Hindi words.
   vegetarian + eggs, or anything. Thresholds and your own lighter/heavier food words are editable.
 - These are simple word-based rules for everyday awareness, **not medical or dietary advice**.
 
+**Medicines (More → Medicines & reminders):** type, paste, scan or upload a prescription. The app suggests each medicine, its times (1-0-1, TDS, "after breakfast and dinner", Hinglish words) and number of days; you choose who it is for and check every line. Reminders are due 5 minutes before the family's usual breakfast / lunch / dinner / bedtime (changeable, with optional per-person times). A web app cannot ring when it is closed, so "Download calendar file" makes repeating events with alarms for your phone's Calendar. Notifications also appear while the app is open. A reminder aid only; it does not replace the doctor's advice.
+
 **PDF bills:** Kitchen → Grocery → "Upload PDF / image" reads online-order invoices. PDFs with real text are read exactly (pdf.js, downloaded once like the photo reader); picture-only PDFs are read like a photo. Always check the lines before saving.
 
 **Photo scanning, honestly:** the bill-photo reader (Tesseract.js) is downloaded once from a public library host the first

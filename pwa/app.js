@@ -12,11 +12,12 @@ import * as grocery from './core/grocery.js';
 import * as food from './core/food.js';
 import { scanBill } from './ocr.js';
 import { readPdf } from './pdfbill.js';
+import * as med from './core/medicine.js';
 
-export const VERSION = 'Build 6 · 2026-11-12 · stock board + roomy bill review';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept, 5 update button, 6 stock board and roomy bill lines. Add 1 on every change.
+export const VERSION = 'Build 7 · 2026-11-12 · medicines & reminders';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept, 5 update button, 6 stock board and roomy bill lines, 7 medicines. Add 1 on every change.
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
-const ui = { bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
+const ui = { rx: null, rxText: '', rxOcr: '', bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
 const today = () => localToday();
 const me = () => state.settings.me || 'Me';
 const $ = (sel) => document.querySelector(sel);
@@ -70,6 +71,16 @@ const kitchenCard = () => {
     ${low.length ? `<div class="muted" style="margin-top:6px">Running low: ${esc(low.slice(0, 6).map((a) => a.label).join(', '))}</div>` : ''}
     <p style="margin:8px 0 0"><a href="#kitchen">Open Kitchen</a></p></div>`;
 };
+const nowClock = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const medicineHomeCard = () => {
+  if (!state.meds.some((m) => m.active)) return '';
+  const left = med.dosesOn(state, today()).filter((d) => !d.taken);
+  if (!left.length) return `<div class="card"><h2>Medicines today</h2><p style="margin:0">All of today's doses are done. ✅</p><p style="margin:8px 0 0"><a href="#medicine">Open Medicines</a></p></div>`;
+  const now = nowClock(), due = left.filter((d) => d.remindAt <= now);
+  return `<div class="card ${due.length ? 'alert' : 'alert info'}"><h2>💊 ${due.length ? 'Medicine due now' : 'Next medicines'}</h2>
+    ${(due.length ? due : left).slice(0, 4).map((d) => `<div class="doserow"><span class="dtime">${esc(med.prettyTime(d.remindAt))}</span><span><b>${esc(d.person)}</b> · ${esc(med.doseWords(d))}<br><span class="muted">${esc(med.doseLine(d))}</span></span></div>`).join('')}
+    <p style="margin:8px 0 0"><a href="#medicine">Open Medicines</a></p></div>`;
+};
 const replyBox = () => {
   if (!ui.reply) return '';
   const r = ui.reply;
@@ -91,6 +102,7 @@ screens.home = () => {
   return `${welcome}
   <div class="card"><h2>Total expenses (all time)</h2><div class="total">${inr(totalExpenses(state))}</div></div>
   ${dueCard()}
+  ${medicineHomeCard()}
   ${kitchenCard()}
   <div class="card"><h2>${esc(o.label)}</h2><div class="stats">
     <div class="stat"><div class="label">Income</div><div class="value pos">${inr(o.income)}</div></div>
@@ -185,6 +197,7 @@ screens.recurring = () => {
 
 screens.more = () => `<div class="card">
   <a class="linkrow" href="#import"><span>📥 Import WhatsApp chat</span><span>›</span></a>
+  <a class="linkrow" href="#medicine"><span>💊 Medicines &amp; reminders</span><span>›</span></a>
   <a class="linkrow" href="#family"><span>👨‍👩‍👧 Family</span><span>›</span></a>
   <a class="linkrow" href="#categories"><span>🏷️ Categories</span><span>›</span></a>
   <a class="linkrow" href="#backup"><span>💾 Backup, restore, Excel</span><span>›</span></a></div>
@@ -193,6 +206,111 @@ screens.more = () => `<div class="card">
   ${ui.install ? '<div class="card"><button data-act="install">Install on this phone</button></div>' : ''}
   <div class="card"><h2>About</h2><p class="muted">Version ${esc(VERSION)}<br>Your data is stored only on this phone. The WhatsApp group chat is the shared record: post expenses there, and anyone who wants the full picture imports the exported chat here.</p>
     <button class="secondary" data-act="refresh-app">🔄 Update app now</button><p class="muted">Throws away the app's saved copy of itself and loads the newest version. Your entries are not touched.</p></div>`;
+
+
+// ------------------------------------------------------------------ medicines
+
+const MEAL_ICON = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', bedtime: '😴' };
+const peopleChoices = () => [...new Set([state.settings.me, ...state.members.map((m) => m.name), ...med.peopleWithMeds(state)].filter(Boolean))];
+const timeInput = (name, v) => `<input type="time" name="${name}" value="${esc(v)}" required>`;
+
+function rxIntro() {
+  const r = ui.rx;
+  return `<div class="card"><h2>Add a prescription</h2>
+    <p class="muted">Type or paste the prescription, or scan or upload it. I suggest the medicines and times; you check every line before anything is saved.</p>
+    <form data-form="read-rx"><div class="grid2"><label>Who is it for?<input name="person" id="rxperson" list="rxpeople" value="${esc(r?.person || '')}" placeholder="Choose or type a name" required autocomplete="off"></label>
+      <label>Start date<input type="date" name="date" id="rxdate" value="${esc(r?.date || today())}" required></label></div>
+    <datalist id="rxpeople">${peopleChoices().map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+    <label>Doctor (optional)<input name="doctor" id="rxdoctor" value="${esc(r?.doctor || '')}" placeholder="e.g. Dr. Sharma"></label>
+    <textarea name="text" id="rxtext" rows="5" placeholder="Tab Metformin 500mg 1-0-1 after food x 30 days&#10;Tab Paracetamol 650mg TDS after meals x 5 days&#10;Cap Omeprazole 20mg OD before breakfast">${esc(ui.rxText)}</textarea>
+    <div class="row"><button>Read prescription</button>
+      <label class="btn secondary" style="margin:0">📷 Scan photo<input type="file" id="rxphoto" accept="image/*" capture="environment" hidden></label>
+      <label class="btn secondary" style="margin:0">📄 Upload PDF / image<input type="file" id="rxfile" accept="application/pdf,.pdf,image/*" hidden></label></div></form>
+    <p class="muted" id="rxStatus">${esc(ui.rxOcr)}</p></div>`;
+}
+function rxReview() {
+  const r = ui.rx; if (!r?.items) return '';
+  return `<div class="card"><h2>Check the medicines for ${esc(r.person)}</h2>
+    <p class="muted">${r.skipped?.length ? `${r.skipped.length} other lines (doctor name, advice, headings) were skipped. ` : ''}Handwritten prescriptions are hard to read: please check every name, time and number of days. This is a reminder aid and does not replace your doctor's advice.</p>
+    <form data-form="save-rx">
+    ${r.items.map((m, i) => `<div class="billrow"><textarea name="name${i}" rows="2" placeholder="Medicine name and strength">${esc(m.name)}</textarea>
+      ${m.flags?.length ? m.flags.map((f) => `<p class="muted neg" style="margin:0 0 6px">⚠ ${esc(f)}</p>`).join('') : ''}
+      <div class="mealpick">${med.MEALS.map((ml) => `<label class="chk"><input type="checkbox" name="t${i}_${ml}" ${m.slots.some((s) => s.meal === ml) ? 'checked' : ''}> ${MEAL_ICON[ml]} ${ml}</label>`).join('')}</div>
+      <div class="billnums" style="grid-template-columns:1.3fr 1fr 40px">
+        <label>When<select name="rel${i}">${options([['after', 'After food'], ['before', 'Before food'], ['with', 'With food'], ['any', 'At that time']], m.relation)}</select></label>
+        <label>Days<input name="days${i}" inputmode="numeric" value="${m.days ?? ''}" placeholder="ongoing"></label>
+        <button type="button" class="small secondary" data-act="rx-del-line" data-i="${i}" aria-label="Remove medicine">✕</button></div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" name="need${i}" ${m.asNeeded ? 'checked' : ''}> only if needed (no reminders)</label></div>`).join('')}
+    <div class="row"><button type="button" class="small secondary" data-act="rx-add-line">+ Add a medicine</button></div>
+    <div class="row"><button>Save medicines</button><button type="button" class="secondary" data-act="rx-cancel">Cancel</button></div></form></div>`;
+}
+function medToday() {
+  const t = today(), doses = med.dosesOn(state, t);
+  if (!doses.length) return `<div class="card"><h2>Today</h2><p class="muted">No medicines due today.</p></div>`;
+  const now = nowClock(), groups = new Map();
+  for (const d of doses) { const k = `${d.remindAt}|${d.person}|${d.meal}|${d.relation}`; (groups.get(k) || groups.set(k, []).get(k)).push(d); }
+  return `<div class="card"><h2>Today</h2>${[...groups.values()].map((g) => { const f = g[0], done = g.every((d) => d.taken), late = !done && f.remindAt < now;
+    return `<div class="dosegroup ${done ? 'done' : late ? 'late' : ''}"><div class="dhead"><b>${esc(med.prettyTime(f.remindAt))}</b> · ${esc(f.person)}<div class="muted">${MEAL_ICON[f.meal]} ${esc(med.doseWords(f))} (${esc(med.prettyTime(f.mealTime))})</div></div>
+      ${g.map((d) => `<label class="chk"><input type="checkbox" data-act="dose" data-key="${esc(d.key)}" ${d.taken ? 'checked' : ''}> ${esc(med.doseLine(d))}</label>`).join('')}</div>`; }).join('')}</div>`;
+}
+function medList() {
+  const active = state.meds.filter((m) => m.active);
+  if (!active.length) return '';
+  const people = med.peopleWithMeds(state);
+  return `<div class="card"><h2>Medicines</h2>${people.map((p) => `<h3 class="pperson">${esc(p)}</h3>${active.filter((m) => m.person === p).map((m) => {
+    const end = med.medEnd(m);
+    const when = m.asNeeded ? 'only if needed' : `${med.REL_TEXT[m.relation]} ${m.slots.map((s) => s.meal).join(', ')}`;
+    return `<div class="item" style="cursor:default"><div class="l"><div class="t">${esc(m.name)}</div><div class="muted">${esc(when)} · ${end ? `until ${niceDate(end)}` : 'ongoing'}${m.doctor ? ' · ' + esc(m.doctor) : ''}</div></div>
+      <div class="r"><button class="small secondary" data-act="med-stop" data-id="${m.id}">Stop</button> <button class="small danger" data-act="med-delete" data-id="${m.id}">✕</button></div></div>`; }).join('')}`).join('')}</div>`;
+}
+function medSettings() {
+  const st = state.settings, people = med.peopleWithMeds(state);
+  return `<div class="card"><h2>Meal times &amp; reminders</h2>
+    <p class="muted">Reminders come ${med.leadOf(state)} minutes before the meal. Set when the family usually eats.</p>
+    <form data-form="med-times"><div class="grid2">${med.MEALS.map((ml) => `<label>${MEAL_ICON[ml]} ${ml[0].toUpperCase() + ml.slice(1)}${timeInput('t_' + ml, st.mealTimes[ml])}</label>`).join('')}
+      <label>Remind minutes before<input name="lead" inputmode="numeric" value="${med.leadOf(state)}"></label></div>
+    ${people.length ? `<details><summary><span>Different times for one person</span></summary><p class="muted">Leave a box empty to use the family time.</p>
+      ${people.map((p, pi) => `<div class="billrow"><b>${esc(p)}</b><div class="grid2" style="margin-top:6px">${med.MEALS.map((ml) => `<label>${ml}<input type="time" name="by${pi}_${ml}" value="${esc(st.mealTimesBy?.[p]?.[ml] || '')}"></label>`).join('')}</div></div>`).join('')}</details>` : ''}
+    <button>Save times</button></form></div>`;
+}
+function medAlarms() {
+  const people = med.peopleWithMeds(state);
+  if (!people.length) return '';
+  const perm = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+  return `<div class="card"><h2>Get reminders on this phone</h2>
+    <p class="muted"><b>Phone calendar (recommended):</b> download the file, open it, and add it to your Calendar. Your phone then rings before every meal even when this app is closed. Add again after saving new medicines.</p>
+    <form data-form="med-ics" class="row"><select name="person"><option value="">Everyone</option>${options(people, '')}</select><button>📅 Download calendar file</button></form>
+    <p class="muted" style="margin-top:12px"><b>While this app is open:</b> ${perm === 'granted' ? 'notifications are on.' : perm === 'denied' ? 'notifications are blocked in the browser settings.' : perm === 'unsupported' ? 'notifications are not available in this browser.' : 'tap to get a notification at reminder time.'}</p>
+    ${perm === 'default' ? '<button class="small secondary" data-act="notify-on">🔔 Turn on notifications</button>' : ''}</div>`;
+}
+screens.medicine = () => `${rxReview()}${medToday()}${rxIntro()}${medList()}${medAlarms()}${medSettings()}`;
+
+function syncRx(form) {
+  if (!form || !ui.rx?.items) return;
+  const f = new FormData(form);
+  ui.rx.items = ui.rx.items.map((m, i) => ({ ...m, name: f.get('name' + i) ?? m.name, relation: f.get('rel' + i) || m.relation, days: f.get('days' + i) ?? m.days, asNeeded: f.has('need' + i),
+    slots: med.MEALS.filter((ml) => f.has(`t${i}_${ml}`)).map((meal) => ({ meal, qty: m.slots.find((s) => s.meal === meal)?.qty || 1 })), flags: m.flags }));
+}
+function startRx(text, note) {
+  const person = $('#rxperson')?.value || ui.rx?.person || '', date = $('#rxdate')?.value || ui.rx?.date || today(), doctor = $('#rxdoctor')?.value || ui.rx?.doctor || '';
+  ui.rxText = text;
+  const parsed = med.parsePrescription(text);
+  ui.rx = { person, date, doctor, items: parsed.items.length ? parsed.items : null, skipped: parsed.skipped };
+  return parsed.items.length;
+}
+const notified = new Set();
+function checkDueDoses() {
+  if (!state.meds.length || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const now = nowClock();
+  for (const d of med.dosesOn(state, today())) {
+    if (d.taken || notified.has(d.key) || d.remindAt > now || d.remindAt < med.clock(Number(now.slice(0, 2)) * 60 + Number(now.slice(3)) - 10)) continue;
+    notified.add(d.key);
+    const title = `💊 ${d.person}: ${med.doseWords(d)}`, body = `${med.doseLine(d)} · ${d.meal} at ${med.prettyTime(d.mealTime)}`;
+    (navigator.serviceWorker?.ready || Promise.reject()).then((r) => r.showNotification(title, { body, tag: d.key, icon: './icon-192.png' })).catch(() => { try { new Notification(title, { body }); } catch { /* ignore */ } });
+    toast(`${title}: ${body}`);
+  }
+}
+setInterval(checkDueDoses, 30000);
 
 screens.import = () => {
   const st = ui.staged;
@@ -385,9 +503,9 @@ function route() {
   const key = name === 'entries' && rest[0] === 'edit' ? 'entries/edit' : name;
   const screen = screens[key] || screens.home;
   $('#view').innerHTML = screen(key === 'entries/edit' ? rest[1] : rest[0]);
-  const tab = ['import', 'family', 'categories', 'backup'].includes(name) ? 'more' : (name === 'entries' ? 'entries' : name);
+  const tab = ['import', 'family', 'categories', 'backup', 'medicine'].includes(name) ? 'more' : (name === 'entries' ? 'entries' : name);
   document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
-  $('#sub').textContent = ({ home: monthOverview(state, today()).label, entries: 'Entries', kitchen: 'Kitchen', reports: 'Reports', recurring: 'Recurring' })[name] || '';
+  $('#sub').textContent = ({ home: monthOverview(state, today()).label, entries: 'Entries', kitchen: 'Kitchen', reports: 'Reports', recurring: 'Recurring', medicine: 'Medicines' })[name] || '';
   if (name === 'backup' && navigator.storage?.persisted) {
     navigator.storage.persisted().then((p) => { const el = $('#persistInfo'); if (el) el.textContent = p ? 'This phone has agreed to keep the data safe from automatic clean-up.' : 'The phone may clear this data if it runs low on space, so keep a backup.'; });
   }
@@ -465,6 +583,28 @@ document.addEventListener('submit', (ev) => {
         ui.bill = null; ui.billText = ''; ui.ocr = ''; persist();
         toast(`Saved ${bill.count} item${bill.count === 1 ? '' : 's'} (${inr(bill.total)})`); refresh(); break;
       }
+      case 'read-rx': {
+        if (!startRx(f.text || '', '')) { ui.rx = { person: f.person, date: f.date, doctor: f.doctor, items: null }; return toast("I couldn't find any medicines. Put one medicine per line, like: Tab Metformin 500mg 1-0-1 after food x 30 days"); }
+        ui.rx.person = f.person; ui.rx.date = f.date; ui.rx.doctor = f.doctor; refresh(); break;
+      }
+      case 'save-rx': {
+        syncRx(form);
+        const added = med.addPrescription(state, { person: f.person ?? ui.rx.person, date: ui.rx.date, doctor: ui.rx.doctor, items: ui.rx.items });
+        ui.rx = null; ui.rxText = ''; ui.rxOcr = ''; persist();
+        toast(`Saved ${added.length} medicine${added.length === 1 ? '' : 's'}. Now add the reminders to your phone calendar below.`); refresh(); break;
+      }
+      case 'med-times': {
+        for (const ml of med.MEALS) if (/^\d{2}:\d{2}$/.test(f['t_' + ml] || '')) state.settings.mealTimes[ml] = f['t_' + ml];
+        const lead = Math.round(Number(f.lead)); if (lead >= 0 && lead <= 60) state.settings.remindLead = lead;
+        med.peopleWithMeds(state).forEach((p, pi) => { const o = {}; for (const ml of med.MEALS) if (/^\d{2}:\d{2}$/.test(f[`by${pi}_${ml}`] || '')) o[ml] = f[`by${pi}_${ml}`]; state.settings.mealTimesBy[p] = o; });
+        persist(); toast('Times saved. Download the calendar file again so your phone uses them.'); refresh(); break;
+      }
+      case 'med-ics': {
+        const { text, events } = med.buildIcs(state, today(), { person: f.person || null });
+        if (!events) return toast('Nothing to remind: no running medicines for that choice.');
+        download(`Medicines-${(f.person || 'Family').replace(/[^\w-]+/g, '_')}-${today()}.ics`, text, 'text/calendar');
+        toast(`Calendar file ready (${events} repeating reminder${events === 1 ? '' : 's'}). Open it and choose Calendar.`); break;
+      }
       case 'meal': {
         food.addMeal(state, { date: f.date, meal: f.meal, place: f.place, dish: f.dish, addedBy: me() }); persist();
         toast('Added'); refresh(); break;
@@ -521,6 +661,12 @@ document.addEventListener('click', async (ev) => {
       case 'bill-add-line': syncBill(document.querySelector('form[data-form=save-bill]')); ui.bill.lines.push({ name: '', qty: null, unit: '', price: null }); refresh(); break;
       case 'bill-del-line': syncBill(document.querySelector('form[data-form=save-bill]')); ui.bill.lines.splice(Number(el.dataset.i), 1); refresh(); break;
       case 'bill-cancel': ui.bill = null; refresh(); break;
+      case 'rx-add-line': syncRx(document.querySelector('form[data-form=save-rx]')); ui.rx.items.push({ name: '', slots: [], relation: 'after', days: null, asNeeded: false, flags: [] }); refresh(); break;
+      case 'rx-del-line': syncRx(document.querySelector('form[data-form=save-rx]')); ui.rx.items.splice(Number(el.dataset.i), 1); if (!ui.rx.items.length) ui.rx.items = null; refresh(); break;
+      case 'rx-cancel': ui.rx = null; ui.rxText = ''; refresh(); break;
+      case 'med-stop': if (confirm('Stop reminders for this medicine?')) { med.stopMed(state, id); persist(); refresh(); } break;
+      case 'med-delete': if (confirm('Delete this medicine?')) { med.deleteMed(state, id); persist(); refresh(); } break;
+      case 'notify-on': { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notifications on while the app is open.' : 'Notifications were not allowed.'); refresh(); break; }
       case 'refresh-app': {   // clears the saved copy of the app (never the data) and reloads
         for (const r of await navigator.serviceWorker?.getRegistrations?.() || []) await r.unregister();
         for (const k of await caches.keys()) if (k !== 'household-shared') await caches.delete(k);
@@ -561,6 +707,22 @@ document.addEventListener('change', async (ev) => {
         const parsed = grocery.parseBill(text, { today: today() });
         status(parsed.lines.length ? 'Done. Please check every line below.' : "I read the file but couldn't find items. Edit the text above and tap Read bill.");
         if (parsed.lines.length) { ui.bill = { date: parsed.date, store: '', lines: parsed.lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, price: l.price })), skipped: parsed.skipped.length }; refresh(); }
+      }
+    } catch (e) { status(e.message || String(e)); }
+    t.value = '';
+  }
+  if (t.dataset?.act === 'dose') { med.markTaken(state, t.dataset.key, t.checked); persist(); refresh(); }
+  if ((t.id === 'rxphoto' || t.id === 'rxfile') && t.files[0]) {
+    const status = (text) => { ui.rxOcr = text; const el = $('#rxStatus'); if (el) el.textContent = text; };
+    try {
+      const f = t.files[0], isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+      const text = isPdf ? await readPdf(f, status) : await scanBill(f, status);
+      if (!text.trim()) status('No text found in that file. Try a clearer picture, or type the prescription.');
+      else {
+        const box = $('#rxtext'); if (box) box.value = text;
+        const n = startRx(text, '');
+        status(n ? 'Done. Please check every medicine below.' : "I read the file but couldn't find medicines. Edit the text above and tap Read prescription.");
+        if (n) refresh();
       }
     } catch (e) { status(e.message || String(e)); }
     t.value = '';

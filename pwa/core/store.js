@@ -9,7 +9,8 @@ export function newState() {
     categories: structuredClone(DEFAULT_CATEGORIES),
     members: [], entries: [], ignoredKeys: [], recurring: [], changes: [],
     bills: [], purchases: [], finished: [], meals: [], foodWords: { healthy: [], less: [] },
-    settings: { me: '', shareAfterSave: true, people: 4 },
+    meds: [], doseLog: {},
+    settings: { me: '', shareAfterSave: true, people: 4, mealTimes: { breakfast: '08:30', lunch: '13:30', dinner: '20:30', bedtime: '22:00' }, mealTimesBy: {}, remindLead: 5 },
   };
 }
 
@@ -20,7 +21,7 @@ export function load(storage) {
   if (!raw) return { state: newState(), problem: null };
   try {
     const data = JSON.parse(raw);
-    return { state: { ...newState(), ...data, settings: { ...newState().settings, ...data.settings } }, problem: null };
+    return { state: { ...newState(), ...data, settings: { ...newState().settings, ...data.settings, mealTimes: { ...newState().settings.mealTimes, ...(data.settings || {}).mealTimes } } }, problem: null };
   } catch {
     try { storage.setItem(KEY + '.damaged', raw); } catch { /* ignore */ }
     return { state: newState(), problem: 'Your saved data could not be read. A copy was kept aside; restore from a backup file if you have one.' };

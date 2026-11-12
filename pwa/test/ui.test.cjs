@@ -236,6 +236,36 @@ const server = http.createServer((req, res) => {
   await tab('home'); assert.match(await text(), /Kitchen/);
   step('meals: log, alerts for outside food and a heavy streak, settings, Home card');
 
+  // ---------------------------------------------------------------- medicines
+  await page.goto(base + 'index.html#medicine');
+  assert.match(await text(), /Add a prescription/);
+  await page.fill('#rxperson', 'Papa');
+  await page.fill('#rxtext', 'Dr. Sharma\nTab. Metformin 500mg 1-0-1 after food x 30 days\nCap Omeprazole 20mg OD before breakfast\nTab Dolo 650 SOS if fever');
+  await page.click('form[data-form=read-rx] button');
+  await page.waitForSelector('form[data-form=save-rx]');
+  assert.equal(await page.inputValue('form[data-form=save-rx] [name=name0]'), 'Metformin 500mg');
+  assert.equal(await page.isChecked('form[data-form=save-rx] [name=t0_dinner]'), true);
+  assert.equal(await page.isChecked('form[data-form=save-rx] [name=t0_lunch]'), false);
+  assert.equal(await page.inputValue('form[data-form=save-rx] [name=days0]'), '30');
+  await shot('medicine-review');
+  await page.click('form[data-form=save-rx] > .row:last-of-type button:first-child'); await page.waitForTimeout(100);
+  const m1 = await text();
+  assert.match(m1, /Metformin 500mg/); assert.match(m1, /Papa/); assert.match(m1, /only if needed/);
+  assert.match(m1, /8:25 am/); assert.match(m1, /8:25 pm/);                 // 5 minutes before 8:30 breakfast and 8:30 dinner
+  await page.check('input[data-act=dose] >> nth=0'); await page.waitForTimeout(80);
+  assert.equal(await page.isChecked('input[data-act=dose] >> nth=0'), true);
+  await shot('medicine');
+  await page.selectOption('form[data-form=med-ics] select[name=person]', 'Papa');
+  const [icsDl] = await Promise.all([page.waitForEvent("download"), page.click("form[data-form=med-ics] button")]);
+  assert.match(icsDl.suggestedFilename(), /^Medicines-Papa-\d{4}-\d{2}-\d{2}\.ics$/);
+  const ics = require('node:fs').readFileSync(await icsDl.path(), 'utf8');
+  assert.match(ics, /BEGIN:VCALENDAR/); assert.match(ics, /RRULE:FREQ=DAILY;COUNT=30/); assert.match(ics, /TRIGGER:PT0M/);
+  await page.fill('form[data-form=med-times] input[name=t_breakfast]', '09:00'); await page.fill('form[data-form=med-times] input[name=lead]', '10');
+  await page.click('form[data-form=med-times] button'); await page.waitForTimeout(80);
+  assert.match(await text(), /8:50 am/);
+  await tab('home'); assert.match(await text(), /Next medicines|Medicine due now|All of today/);
+  step('medicines: read prescription, check lines, save, today list, tick, calendar file, meal times');
+
   assert.deepEqual(errors, [], 'browser errors: ' + errors.join('\n'));
   await browser.close(); server.close(); console.log('UI TESTS PASSED');
 })().catch(async (e) => { console.error('UI TEST FAILED:', e.message); process.exit(1); });

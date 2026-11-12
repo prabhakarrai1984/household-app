@@ -83,3 +83,14 @@ summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8
 .pwhen { white-space: nowrap; font-size: 0.8rem; font-weight: 600; color: var(--c); text-align: right; }
 .pbar { grid-column: 1 / -1; display: block; height: 8px; border-radius: 999px; background: var(--line); margin-top: 4px; overflow: hidden; }
 .pbar i { display: block; height: 100%; background: var(--c); border-radius: 999px; }
+
+/* medicines */
+.doserow { display: flex; gap: 10px; padding: 4px 0; } .dtime { min-width: 64px; font-weight: 700; color: var(--accent); }
+.dosegroup { border-left: 5px solid var(--accent); background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.dosegroup.late { border-left-color: var(--s-low); } .dosegroup.done { border-left-color: var(--s-full); opacity: .6; }
+.dosegroup.done .chk { text-decoration: line-through; }
+.dhead { margin-bottom: 4px; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 1rem; color: var(--text); padding: 4px 0; }
+.chk input { width: 22px; height: 22px; padding: 0; flex: none; }
+.mealpick { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 6px; }
+.pperson { font-size: 0.9rem; margin: 10px 0 2px; }
