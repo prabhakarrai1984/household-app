@@ -14,7 +14,7 @@ import { scanBill } from './ocr.js';
 import { readPdf } from './pdfbill.js';
 import * as med from './core/medicine.js';
 
-export const VERSION = 'Build 7 · 2026-11-12 · medicines & reminders';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept, 5 update button, 6 stock board and roomy bill lines, 7 medicines. Add 1 on every change.
+export const VERSION = 'Build 8 · 2026-11-14 · prescription photo reading improved';   // build 1 Kitchen, 2 PDF upload, 3 DMart invoice, 4 non-food kept, 5 update button, 6 stock board and roomy bill lines, 7 medicines, 8 printed prescriptions. Add 1 on every change.
 const loaded = store.load(window.localStorage);
 let state = loaded.state;
 const ui = { rx: null, rxText: '', rxOcr: '', bill: null, billText: '', ocr: '', reply: null, report: { period: 'month' }, search: '', limit: 60, staged: null, install: null };
@@ -231,13 +231,14 @@ function rxIntro() {
 function rxReview() {
   const r = ui.rx; if (!r?.items) return '';
   return `<div class="card"><h2>Check the medicines for ${esc(r.person)}</h2>
-    <p class="muted">${r.skipped?.length ? `${r.skipped.length} other lines (doctor name, advice, headings) were skipped. ` : ''}Handwritten prescriptions are hard to read: please check every name, time and number of days. This is a reminder aid and does not replace your doctor's advice.</p>
+    ${r.patient ? `<p class="muted" style="margin-top:0">The prescription says it is for <b>${esc(r.patient)}</b>.${r.person ? '' : ' Choose that family member at the top.'}</p>` : ''}<p class="muted">${r.skipped?.length ? `${r.skipped.length} other lines (doctor name, advice, headings) were skipped. ` : ''}Handwritten prescriptions are hard to read: please check every name, time and number of days. This is a reminder aid and does not replace your doctor's advice.</p>
     <form data-form="save-rx">
     ${r.items.map((m, i) => `<div class="billrow"><textarea name="name${i}" rows="2" placeholder="Medicine name and strength">${esc(m.name)}</textarea>
       ${m.flags?.length ? m.flags.map((f) => `<p class="muted neg" style="margin:0 0 6px">⚠ ${esc(f)}</p>`).join('') : ''}
       <div class="mealpick">${med.MEALS.map((ml) => `<label class="chk"><input type="checkbox" name="t${i}_${ml}" ${m.slots.some((s) => s.meal === ml) ? 'checked' : ''}> ${MEAL_ICON[ml]} ${ml}</label>`).join('')}</div>
-      <div class="billnums" style="grid-template-columns:1.3fr 1fr 40px">
+      <div class="billnums" style="grid-template-columns:1.3fr .8fr 1fr 40px">
         <label>When<select name="rel${i}">${options([['after', 'After food'], ['before', 'Before food'], ['with', 'With food'], ['any', 'At that time']], m.relation)}</select></label>
+        <label>Each time<input name="qty${i}" inputmode="decimal" value="${m.slots[0]?.qty ?? 1}"></label>
         <label>Days<input name="days${i}" inputmode="numeric" value="${m.days ?? ''}" placeholder="ongoing"></label>
         <button type="button" class="small secondary" data-act="rx-del-line" data-i="${i}" aria-label="Remove medicine">✕</button></div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" name="need${i}" ${m.asNeeded ? 'checked' : ''}> only if needed (no reminders)</label></div>`).join('')}
@@ -289,13 +290,13 @@ function syncRx(form) {
   if (!form || !ui.rx?.items) return;
   const f = new FormData(form);
   ui.rx.items = ui.rx.items.map((m, i) => ({ ...m, name: f.get('name' + i) ?? m.name, relation: f.get('rel' + i) || m.relation, days: f.get('days' + i) ?? m.days, asNeeded: f.has('need' + i),
-    slots: med.MEALS.filter((ml) => f.has(`t${i}_${ml}`)).map((meal) => ({ meal, qty: m.slots.find((s) => s.meal === meal)?.qty || 1 })), flags: m.flags }));
+    slots: med.MEALS.filter((ml) => f.has(`t${i}_${ml}`)).map((meal) => ({ meal, qty: Number(f.get('qty' + i)) > 0 ? Number(f.get('qty' + i)) : 1 })), flags: m.flags }));
 }
 function startRx(text, note) {
   const person = $('#rxperson')?.value || ui.rx?.person || '', date = $('#rxdate')?.value || ui.rx?.date || today(), doctor = $('#rxdoctor')?.value || ui.rx?.doctor || '';
   ui.rxText = text;
   const parsed = med.parsePrescription(text);
-  ui.rx = { person, date, doctor, items: parsed.items.length ? parsed.items : null, skipped: parsed.skipped };
+  ui.rx = { person, date, doctor, patient: parsed.patient, items: parsed.items.length ? parsed.items : null, skipped: parsed.skipped };
   return parsed.items.length;
 }
 const notified = new Set();

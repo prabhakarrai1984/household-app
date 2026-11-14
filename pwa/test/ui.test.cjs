@@ -243,14 +243,14 @@ const server = http.createServer((req, res) => {
   await page.fill('#rxtext', 'Dr. Sharma\nTab. Metformin 500mg 1-0-1 after food x 30 days\nCap Omeprazole 20mg OD before breakfast\nTab Dolo 650 SOS if fever');
   await page.click('form[data-form=read-rx] button');
   await page.waitForSelector('form[data-form=save-rx]');
-  assert.equal(await page.inputValue('form[data-form=save-rx] [name=name0]'), 'Metformin 500mg');
+  assert.equal(await page.inputValue('form[data-form=save-rx] [name=name0]'), 'Tab. Metformin 500 mg');
   assert.equal(await page.isChecked('form[data-form=save-rx] [name=t0_dinner]'), true);
   assert.equal(await page.isChecked('form[data-form=save-rx] [name=t0_lunch]'), false);
   assert.equal(await page.inputValue('form[data-form=save-rx] [name=days0]'), '30');
   await shot('medicine-review');
   await page.click('form[data-form=save-rx] > .row:last-of-type button:first-child'); await page.waitForTimeout(100);
   const m1 = await text();
-  assert.match(m1, /Metformin 500mg/); assert.match(m1, /Papa/); assert.match(m1, /only if needed/);
+  assert.match(m1, /Metformin 500 mg/); assert.match(m1, /Papa/); assert.match(m1, /only if needed/);
   assert.match(m1, /8:25 am/); assert.match(m1, /8:25 pm/);                 // 5 minutes before 8:30 breakfast and 8:30 dinner
   await page.check('input[data-act=dose] >> nth=0'); await page.waitForTimeout(80);
   assert.equal(await page.isChecked('input[data-act=dose] >> nth=0'), true);

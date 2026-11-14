@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePrescription, parseSchedule, addPrescription, dosesOn, markTaken, buildIcs, mealTimeFor, clock, peopleWithMeds, stopMed } from '../core/medicine.js';
 import { newState } from '../core/store.js';
+import fs from 'node:fs';
 
 const RX = `Dr. Sharma MBBS
 Date 12/11/2026
@@ -18,7 +19,7 @@ Advice: drink water`;
 
 test('prescription lines become medicines with times, relation and days', () => {
   const { items } = parsePrescription(RX);
-  const by = (n) => items.find((i) => i.name.startsWith(n));
+  const by = (n) => items.find((i) => i.name.includes(n));
   assert.equal(items.length, 8);
   assert.deepEqual(by('Metformin').slots.map((s) => s.meal), ['breakfast', 'dinner']);
   assert.equal(by('Metformin').relation, 'after'); assert.equal(by('Metformin').days, 30);
@@ -74,4 +75,20 @@ test('calendar file: one repeating event per person and meal, alarm at the remin
   assert.match(buildIcs(st, '2026-11-20').text, /COUNT=22/);   // 22 days left on 20 Nov
   st.settings.remindLead = 10; assert.match(buildIcs(st, '2026-11-12').text, /DTSTART:20261112T082000/);
   assert.equal(mealTimeFor(st, 'Papa', 'lunch'), '13:30');
+});
+
+test('printed prescription: name on one line, directions on the next (real OCR output of a clinic prescription)', () => {
+  for (const f of ['printed_prescription_ocr.txt', 'printed_prescription_ocr2.txt']) {
+    const { items, patient } = parsePrescription(fs.readFileSync(new URL('./fixtures/' + f, import.meta.url), 'utf8'));
+    const by = (n) => items.find((i) => i.name.toLowerCase().includes(n));
+    assert.equal(items.length, 7, f);
+    assert.equal(by('defcort').name, 'Defcort Tab. 24 mg'); assert.deepEqual(by('defcort').slots.map((s) => s.meal), ['breakfast']); assert.equal(by('defcort').relation, 'after');
+    assert.deepEqual(by('topp d').slots.map((s) => s.meal), ['breakfast', 'dinner']); assert.equal(by('topp d').days, 5);
+    assert.match(by('allegr').name, /^Allegr 180 mg/); assert.deepEqual(by('allegr').slots.map((s) => s.meal), ['bedtime']); assert.ok([null, 10].includes(by('allegr').days));   // the days cell is not always read
+    assert.match(by('des-sure').name, /^Des-Sure Tab \(Desloratidine\) 5 mg/); assert.deepEqual(by('des-sure').slots.map((s) => s.meal), ['breakfast', 'dinner']); assert.equal(by('des-sure').days, 20);
+    assert.equal(by('atarax').name, 'Atarax 10 mg Tablets'); assert.deepEqual(by('atarax').slots.map((s) => s.meal), ['bedtime']);   // "at bedtime after dinner" is one dose
+    assert.equal(by('moisup').name, 'Moisup Moisturizer'); assert.equal(by('niosol').name, 'Niosol F Cream');
+    assert.deepEqual(by('niosol').slots.map((s) => s.meal), ['bedtime']);
+    assert.equal(patient, 'Test Patient');
+  }
 });
